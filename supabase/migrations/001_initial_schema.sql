@@ -104,9 +104,22 @@ CREATE TRIGGER trg_apontamentos_updated_at
 CREATE OR REPLACE FUNCTION handle_new_user()
 RETURNS TRIGGER AS $$
 BEGIN
-  INSERT INTO profiles(user_id, name, role)
-  VALUES (NEW.id, COALESCE(NEW.raw_user_meta_data->>'name', NEW.email),
-          COALESCE(NEW.raw_user_meta_data->>'role', 'worker'));
+  INSERT INTO public.profiles(user_id, name, role)
+  VALUES (
+    NEW.id,
+    COALESCE(
+      NULLIF(NEW.raw_user_meta_data->>'name', ''),
+      NULLIF(NEW.raw_user_meta_data->>'full_name', ''),
+      split_part(NEW.email, '@', 1),
+      'Usuário'
+    ),
+    COALESCE(
+      CASE WHEN NEW.raw_user_meta_data->>'role' IN ('director','manager','leader','worker')
+           THEN NEW.raw_user_meta_data->>'role' END,
+      'worker'
+    )
+  )
+  ON CONFLICT (user_id) DO NOTHING;
   RETURN NEW;
 END;
 $$ LANGUAGE plpgsql SECURITY DEFINER;
