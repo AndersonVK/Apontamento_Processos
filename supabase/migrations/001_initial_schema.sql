@@ -2,7 +2,7 @@
 CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
 
 -- Teams
-CREATE TABLE teams (
+CREATE TABLE IF NOT EXISTS teams (
   id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
   name TEXT NOT NULL,
   leader_id UUID,
@@ -10,7 +10,7 @@ CREATE TABLE teams (
 );
 
 -- Profiles (linked to Supabase auth users)
-CREATE TABLE profiles (
+CREATE TABLE IF NOT EXISTS profiles (
   id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
   user_id UUID REFERENCES auth.users(id) ON DELETE CASCADE UNIQUE,
   name TEXT NOT NULL,
@@ -19,11 +19,11 @@ CREATE TABLE profiles (
   created_at TIMESTAMPTZ DEFAULT NOW()
 );
 
-ALTER TABLE teams ADD CONSTRAINT fk_leader
+ALTER TABLE teams ADD CONSTRAINT IF NOT EXISTS fk_leader
   FOREIGN KEY (leader_id) REFERENCES profiles(id);
 
 -- Employees (workers tracked in apontamentos – not necessarily app users)
-CREATE TABLE employees (
+CREATE TABLE IF NOT EXISTS employees (
   id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
   name TEXT NOT NULL,
   registration TEXT,
@@ -33,7 +33,7 @@ CREATE TABLE employees (
 );
 
 -- Activities
-CREATE TABLE activities (
+CREATE TABLE IF NOT EXISTS activities (
   id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
   name TEXT NOT NULL,
   active BOOLEAN DEFAULT TRUE,
@@ -41,7 +41,7 @@ CREATE TABLE activities (
 );
 
 -- Extra fields per activity
-CREATE TABLE activity_fields (
+CREATE TABLE IF NOT EXISTS activity_fields (
   id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
   activity_id UUID REFERENCES activities(id) ON DELETE CASCADE,
   name TEXT NOT NULL,
@@ -52,7 +52,7 @@ CREATE TABLE activity_fields (
 );
 
 -- Options for select-type fields
-CREATE TABLE activity_field_options (
+CREATE TABLE IF NOT EXISTS activity_field_options (
   id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
   field_id UUID REFERENCES activity_fields(id) ON DELETE CASCADE,
   label TEXT NOT NULL,
@@ -61,9 +61,9 @@ CREATE TABLE activity_field_options (
 );
 
 -- Apontamentos (production records)
-CREATE TABLE apontamentos (
+CREATE TABLE IF NOT EXISTS apontamentos (
   id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-  local_id TEXT UNIQUE,             -- set when created offline
+  local_id TEXT UNIQUE,
   employee_id UUID REFERENCES employees(id),
   activity_id UUID REFERENCES activities(id),
   leader_id UUID REFERENCES profiles(id),
@@ -76,7 +76,7 @@ CREATE TABLE apontamentos (
 );
 
 -- Field values for each apontamento
-CREATE TABLE apontamento_field_values (
+CREATE TABLE IF NOT EXISTS apontamento_field_values (
   id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
   apontamento_id UUID REFERENCES apontamentos(id) ON DELETE CASCADE,
   field_id UUID REFERENCES activity_fields(id),
@@ -84,10 +84,10 @@ CREATE TABLE apontamento_field_values (
 );
 
 -- Indexes
-CREATE INDEX idx_apontamentos_work_date ON apontamentos(work_date);
-CREATE INDEX idx_apontamentos_leader ON apontamentos(leader_id);
-CREATE INDEX idx_apontamentos_employee ON apontamentos(employee_id);
-CREATE INDEX idx_employees_team ON employees(team_id);
+CREATE INDEX IF NOT EXISTS idx_apontamentos_work_date ON apontamentos(work_date);
+CREATE INDEX IF NOT EXISTS idx_apontamentos_leader ON apontamentos(leader_id);
+CREATE INDEX IF NOT EXISTS idx_apontamentos_employee ON apontamentos(employee_id);
+CREATE INDEX IF NOT EXISTS idx_employees_team ON employees(team_id);
 
 -- Updated_at trigger
 CREATE OR REPLACE FUNCTION update_updated_at()
@@ -95,11 +95,12 @@ RETURNS TRIGGER AS $$
 BEGIN NEW.updated_at = NOW(); RETURN NEW; END;
 $$ LANGUAGE plpgsql;
 
+DROP TRIGGER IF EXISTS trg_apontamentos_updated_at ON apontamentos;
 CREATE TRIGGER trg_apontamentos_updated_at
   BEFORE UPDATE ON apontamentos
   FOR EACH ROW EXECUTE FUNCTION update_updated_at();
 
--- Auto-create profile on new auth user (optional helper)
+-- Auto-create profile on new auth user
 CREATE OR REPLACE FUNCTION handle_new_user()
 RETURNS TRIGGER AS $$
 BEGIN
@@ -110,6 +111,7 @@ BEGIN
 END;
 $$ LANGUAGE plpgsql SECURITY DEFINER;
 
+DROP TRIGGER IF EXISTS on_auth_user_created ON auth.users;
 CREATE TRIGGER on_auth_user_created
   AFTER INSERT ON auth.users
   FOR EACH ROW EXECUTE FUNCTION handle_new_user();
@@ -127,7 +129,7 @@ ALTER TABLE activity_field_options ENABLE ROW LEVEL SECURITY;
 ALTER TABLE apontamentos ENABLE ROW LEVEL SECURITY;
 ALTER TABLE apontamento_field_values ENABLE ROW LEVEL SECURITY;
 
--- Helper: current user's profile
+-- Helper functions
 CREATE OR REPLACE FUNCTION my_profile()
 RETURNS profiles AS $$
   SELECT * FROM profiles WHERE user_id = auth.uid() LIMIT 1;
@@ -143,21 +145,38 @@ RETURNS UUID AS $$
   SELECT team_id FROM profiles WHERE user_id = auth.uid() LIMIT 1;
 $$ LANGUAGE sql SECURITY DEFINER STABLE;
 
--- Profiles: everyone sees their own; director/manager see all
+-- Policies (drop before recreate to allow idempotent runs)
+DO $$ BEGIN
+  DROP POLICY IF EXISTS "profiles_select" ON profiles;
+  DROP POLICY IF EXISTS "profiles_update_own" ON profiles;
+  DROP POLICY IF EXISTS "teams_select" ON teams;
+  DROP POLICY IF EXISTS "teams_manage" ON teams;
+  DROP POLICY IF EXISTS "employees_select" ON employees;
+  DROP POLICY IF EXISTS "employees_manage" ON employees;
+  DROP POLICY IF EXISTS "employees_update" ON employees;
+  DROP POLICY IF EXISTS "activities_select" ON activities;
+  DROP POLICY IF EXISTS "activities_manage" ON activities;
+  DROP POLICY IF EXISTS "fields_select" ON activity_fields;
+  DROP POLICY IF EXISTS "fields_manage" ON activity_fields;
+  DROP POLICY IF EXISTS "field_options_select" ON activity_field_options;
+  DROP POLICY IF EXISTS "field_options_manage" ON activity_field_options;
+  DROP POLICY IF EXISTS "apontamentos_select" ON apontamentos;
+  DROP POLICY IF EXISTS "apontamentos_insert" ON apontamentos;
+  DROP POLICY IF EXISTS "apontamentos_delete" ON apontamentos;
+  DROP POLICY IF EXISTS "field_values_select" ON apontamento_field_values;
+  DROP POLICY IF EXISTS "field_values_insert" ON apontamento_field_values;
+  DROP POLICY IF EXISTS "field_values_delete" ON apontamento_field_values;
+END $$;
+
 CREATE POLICY "profiles_select" ON profiles FOR SELECT
-  USING (
-    user_id = auth.uid()
-    OR my_role() IN ('director', 'manager')
-  );
+  USING (user_id = auth.uid() OR my_role() IN ('director', 'manager'));
 CREATE POLICY "profiles_update_own" ON profiles FOR UPDATE
   USING (user_id = auth.uid());
 
--- Teams: all authenticated users can read
 CREATE POLICY "teams_select" ON teams FOR SELECT USING (auth.uid() IS NOT NULL);
 CREATE POLICY "teams_manage" ON teams FOR ALL
   USING (my_role() IN ('director', 'manager'));
 
--- Employees: leaders see their team; managers/directors see all
 CREATE POLICY "employees_select" ON employees FOR SELECT
   USING (
     my_role() IN ('director', 'manager')
@@ -169,7 +188,6 @@ CREATE POLICY "employees_manage" ON employees FOR INSERT
 CREATE POLICY "employees_update" ON employees FOR UPDATE
   USING (my_role() IN ('director', 'manager', 'leader'));
 
--- Activities: all can read; non-workers can manage
 CREATE POLICY "activities_select" ON activities FOR SELECT USING (auth.uid() IS NOT NULL);
 CREATE POLICY "activities_manage" ON activities FOR ALL
   USING (my_role() IN ('director', 'manager', 'leader'));
@@ -182,7 +200,6 @@ CREATE POLICY "field_options_select" ON activity_field_options FOR SELECT USING 
 CREATE POLICY "field_options_manage" ON activity_field_options FOR ALL
   USING (my_role() IN ('director', 'manager', 'leader'));
 
--- Apontamentos: leaders see own; managers/directors see all
 CREATE POLICY "apontamentos_select" ON apontamentos FOR SELECT
   USING (
     my_role() IN ('director', 'manager')
@@ -226,24 +243,3 @@ CREATE POLICY "field_values_delete" ON apontamento_field_values FOR DELETE
       )
     )
   );
-
--- ──────────────────────────────
--- SEED DATA (examples)
--- ──────────────────────────────
-
-INSERT INTO activities (name) VALUES ('Colheita'), ('Desfolha'), ('Irrigação'), ('Poda');
-
--- Colheita: quantidade (number)
-INSERT INTO activity_fields (activity_id, name, field_type, unit, required, sort_order)
-SELECT id, 'Quantidade', 'number', 'caixas', TRUE, 0 FROM activities WHERE name = 'Colheita';
-
--- Desfolha: qualidade (select)
-INSERT INTO activity_fields (activity_id, name, field_type, required, sort_order)
-SELECT id, 'Qualidade', 'select', FALSE, 0 FROM activities WHERE name = 'Desfolha';
-
-INSERT INTO activity_field_options (field_id, label, value, sort_order)
-SELECT af.id, opt.label, opt.val, opt.ord
-FROM activity_fields af
-JOIN activities a ON a.id = af.activity_id AND a.name = 'Desfolha'
-CROSS JOIN (VALUES ('A', 'a', 0), ('B', 'b', 1), ('C', 'c', 2)) AS opt(label, val, ord)
-WHERE af.name = 'Qualidade';
