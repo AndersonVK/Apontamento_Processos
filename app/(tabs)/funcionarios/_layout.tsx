@@ -9,7 +9,12 @@ export default function FuncionariosLayout() {
         headerTitleStyle: { fontWeight: '700', color: Colors.text },
         headerShadowVisible: false,
         headerTintColor: Colors.primary,
+        headerBackTitle: 'Voltar',
       }}
-    />
+    >
+      <Stack.Screen name="index" options={{ headerShown: false }} />
+      <Stack.Screen name="new" options={{ title: 'Novo funcionário' }} />
+      <Stack.Screen name="[id]" options={{ title: 'Funcionário' }} />
+    </Stack>
   );
 }

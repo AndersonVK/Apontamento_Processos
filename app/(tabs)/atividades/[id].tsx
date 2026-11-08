@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useCallback, useState } from 'react';
 import {
   View,
   Text,
@@ -9,7 +9,7 @@ import {
   Platform,
   TouchableOpacity,
 } from 'react-native';
-import { useLocalSearchParams, useRouter } from 'expo-router';
+import { useLocalSearchParams, useRouter, useFocusEffect } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { supabase } from '../../../lib/supabase';
 import { Activity, ActivityField, FieldType } from '../../../types';
@@ -38,7 +38,7 @@ export default function EditAtividadeScreen() {
     }
   }
 
-  useEffect(() => { load(); }, [id]);
+  useFocusEffect(useCallback(() => { load(); }, [id]));
 
   async function handleSaveName() {
     if (!name.trim()) return;
@@ -109,7 +109,14 @@ function FieldRow({ field, onDelete }: { field: ActivityField; onDelete: () => v
         text: 'Remover',
         style: 'destructive',
         onPress: async () => {
-          await supabase.from('activity_fields').delete().eq('id', field.id);
+          const { error } = await supabase.from('activity_fields').delete().eq('id', field.id);
+          if (error) {
+            Alert.alert(
+              'Não foi possível remover',
+              'Este campo já foi usado em apontamentos. Para preservar o histórico, ele não pode ser removido.'
+            );
+            return;
+          }
           onDelete();
         },
       },

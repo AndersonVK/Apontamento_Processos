@@ -8,6 +8,7 @@ import {
   Alert,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import { useRouter } from 'expo-router';
 import { useAuth } from '../../../contexts/AuthContext';
 import { Colors } from '../../../constants/colors';
 
@@ -20,6 +21,8 @@ const ROLE_LABELS: Record<string, string> = {
 
 export default function ConfiguracoesScreen() {
   const { profile, signOut } = useAuth();
+  const router = useRouter();
+  const canManage = profile?.role === 'director' || profile?.role === 'manager';
 
   function handleSignOut() {
     Alert.alert('Sair', 'Deseja sair da conta?', [
@@ -49,6 +52,26 @@ export default function ConfiguracoesScreen() {
             </Text>
           </View>
         </View>
+
+        {canManage && (
+          <View style={styles.section}>
+            <Text style={styles.sectionTitle}>Gerenciar</Text>
+            <TouchableOpacity style={styles.moduleItem} onPress={() => router.push('/configuracoes/equipes')}>
+              <View style={styles.moduleIcon}>
+                <Ionicons name="people-outline" size={20} color={Colors.primary} />
+              </View>
+              <Text style={[styles.moduleName, { flex: 1 }]}>Equipes</Text>
+              <Ionicons name="chevron-forward" size={16} color={Colors.gray300} />
+            </TouchableOpacity>
+            <TouchableOpacity style={styles.moduleItem} onPress={() => router.push('/configuracoes/usuarios')}>
+              <View style={styles.moduleIcon}>
+                <Ionicons name="key-outline" size={20} color={Colors.primary} />
+              </View>
+              <Text style={[styles.moduleName, { flex: 1 }]}>Usuários e perfis</Text>
+              <Ionicons name="chevron-forward" size={16} color={Colors.gray300} />
+            </TouchableOpacity>
+          </View>
+        )}
 
         {/* Processos placeholder */}
         <View style={styles.section}>

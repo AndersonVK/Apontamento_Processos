@@ -19,8 +19,12 @@ CREATE TABLE IF NOT EXISTS profiles (
   created_at TIMESTAMPTZ DEFAULT NOW()
 );
 
-ALTER TABLE teams ADD CONSTRAINT IF NOT EXISTS fk_leader
-  FOREIGN KEY (leader_id) REFERENCES profiles(id);
+DO $$ BEGIN
+  IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'fk_leader') THEN
+    ALTER TABLE teams ADD CONSTRAINT fk_leader
+      FOREIGN KEY (leader_id) REFERENCES profiles(id);
+  END IF;
+END $$;
 
 -- Employees (workers tracked in apontamentos – not necessarily app users)
 CREATE TABLE IF NOT EXISTS employees (

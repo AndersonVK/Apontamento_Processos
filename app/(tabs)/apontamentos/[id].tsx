@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useCallback, useState } from 'react';
 import {
   View,
   Text,
@@ -8,7 +8,7 @@ import {
   Alert,
   TouchableOpacity,
 } from 'react-native';
-import { useLocalSearchParams, useRouter } from 'expo-router';
+import { useLocalSearchParams, useRouter, useFocusEffect } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { supabase } from '../../../lib/supabase';
 import { Apontamento } from '../../../types';
@@ -16,6 +16,7 @@ import { useAuth } from '../../../contexts/AuthContext';
 import { Card } from '../../../components/ui/Card';
 import { Button } from '../../../components/ui/Button';
 import { Colors } from '../../../constants/colors';
+import { notifyQueueChange } from '../../../lib/sync';
 import { shortTime, formatDuration } from '../../../lib/date';
 
 export default function ApontamentoDetailScreen() {
@@ -44,7 +45,7 @@ export default function ApontamentoDetailScreen() {
     setLoading(false);
   }
 
-  useEffect(() => { load(); }, [id]);
+  useFocusEffect(useCallback(() => { load(); }, [id]));
 
   async function handleDelete() {
     Alert.alert('Excluir', 'Deseja excluir este apontamento?', [
@@ -53,7 +54,12 @@ export default function ApontamentoDetailScreen() {
         text: 'Excluir',
         style: 'destructive',
         onPress: async () => {
-          await supabase.from('apontamentos').delete().eq('id', id);
+          const { error } = await supabase.from('apontamentos').delete().eq('id', id);
+          if (error) {
+            Alert.alert('Erro', error.message);
+            return;
+          }
+          notifyQueueChange();
           router.back();
         },
       },
@@ -130,6 +136,16 @@ export default function ApontamentoDetailScreen() {
           </>
         )}
       </Card>
+
+      {canDelete && (
+        <Button
+          title="Editar apontamento"
+          onPress={() => router.push(`/apontamentos/edit/${id}`)}
+          variant="secondary"
+          fullWidth
+          style={{ marginTop: 8 }}
+        />
+      )}
 
       {canDelete && (
         <Button
