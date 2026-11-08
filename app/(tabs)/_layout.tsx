@@ -4,9 +4,14 @@ import { Ionicons } from '@expo/vector-icons';
 import { useAuth } from '../../contexts/AuthContext';
 import { Colors } from '../../constants/colors';
 import { Platform } from 'react-native';
+import { useEmployees } from '../../hooks/useEmployees';
+import { useActivities } from '../../hooks/useActivities';
 
 export default function TabsLayout() {
   const { profile } = useAuth();
+  // mantém funcionários e atividades guardados no aparelho para uso offline
+  useEmployees(false);
+  useActivities();
   const isManager = profile?.role === 'director' || profile?.role === 'manager';
 
   return (

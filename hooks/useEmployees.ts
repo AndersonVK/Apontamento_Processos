@@ -12,8 +12,15 @@ export function useEmployees(teamOnly = false) {
   const cacheKey = `employees:${teamOnly ? profile?.team_id ?? 'none' : 'all'}`;
 
   const load = useCallback(async () => {
-    setLoading(true);
     setError(null);
+    // mostra imediatamente o que está guardado no aparelho (funciona sem internet)
+    const cached = await cacheGet<Employee[]>(cacheKey);
+    if (cached) {
+      setEmployees(cached);
+      setLoading(false);
+    } else {
+      setLoading(true);
+    }
     try {
       let query = supabase
         .from('employees')
@@ -30,10 +37,8 @@ export function useEmployees(teamOnly = false) {
       setEmployees((data as Employee[]) ?? []);
       cacheSet(cacheKey, data ?? []);
     } catch (e: any) {
-      // sem internet: usa a última lista guardada no aparelho
-      const cached = await cacheGet<Employee[]>(cacheKey);
-      if (cached) setEmployees(cached);
-      else setError(e?.message ?? 'Erro ao carregar funcionários');
+      // sem internet: segue com a lista guardada (se houver)
+      if (!cached) setError(e?.message ?? 'Erro ao carregar funcionários');
     }
     setLoading(false);
   }, [teamOnly, profile?.team_id, cacheKey]);

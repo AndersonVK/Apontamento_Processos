@@ -9,8 +9,14 @@ export function useActivities() {
   const [error, setError] = useState<string | null>(null);
 
   const load = useCallback(async () => {
-    setLoading(true);
     setError(null);
+    const cached = await cacheGet<Activity[]>('activities');
+    if (cached) {
+      setActivities(cached);
+      setLoading(false);
+    } else {
+      setLoading(true);
+    }
     try {
       const { data, error } = await supabase
         .from('activities')
@@ -39,9 +45,7 @@ export function useActivities() {
       setActivities(sorted);
       cacheSet('activities', sorted);
     } catch (e: any) {
-      const cached = await cacheGet<Activity[]>('activities');
-      if (cached) setActivities(cached);
-      else setError(e?.message ?? 'Erro ao carregar atividades');
+      if (!cached) setError(e?.message ?? 'Erro ao carregar atividades');
     }
     setLoading(false);
   }, []);
