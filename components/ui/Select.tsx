@@ -5,6 +5,7 @@ import {
   TouchableOpacity,
   Modal,
   FlatList,
+  TextInput,
   StyleSheet,
   ViewStyle,
 } from 'react-native';
@@ -38,6 +39,11 @@ export function Select({
   required,
 }: SelectProps) {
   const [open, setOpen] = useState(false);
+  const [query, setQuery] = useState('');
+  const searchable = options.length > 8;
+  const shown = query.trim()
+    ? options.filter((o) => o.label.toLowerCase().includes(query.trim().toLowerCase()))
+    : options;
   const selected = options.find((o) => o.value === value);
 
   return (
@@ -50,7 +56,7 @@ export function Select({
       )}
       <TouchableOpacity
         style={[styles.trigger, error && styles.triggerError]}
-        onPress={() => setOpen(true)}
+        onPress={() => { setQuery(''); setOpen(true); }}
         activeOpacity={0.7}
       >
         <Text style={[styles.triggerText, !selected && styles.placeholder]}>
@@ -73,8 +79,19 @@ export function Select({
                 <Ionicons name="close" size={22} color={Colors.gray500} />
               </TouchableOpacity>
             </View>
+            {searchable && (
+              <TextInput
+                style={styles.search}
+                value={query}
+                onChangeText={setQuery}
+                placeholder="Buscar..."
+                placeholderTextColor={Colors.gray400}
+                autoCorrect={false}
+              />
+            )}
             <FlatList
-              data={options}
+              keyboardShouldPersistTaps="handled"
+              data={shown}
               keyExtractor={(item) => item.value}
               renderItem={({ item }) => (
                 <TouchableOpacity
@@ -149,6 +166,16 @@ const styles = StyleSheet.create({
     borderBottomColor: Colors.border,
   },
   sheetTitle: { fontSize: 16, fontWeight: '600', color: Colors.text },
+  search: {
+    margin: 12,
+    borderWidth: 1.5,
+    borderColor: Colors.border,
+    borderRadius: 10,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    fontSize: 15,
+    color: Colors.text,
+  },
   option: {
     flexDirection: 'row',
     alignItems: 'center',

@@ -16,6 +16,7 @@ import { useAuth } from '../../../contexts/AuthContext';
 import { Card } from '../../../components/ui/Card';
 import { Button } from '../../../components/ui/Button';
 import { Colors } from '../../../constants/colors';
+import { shortTime, formatDuration } from '../../../lib/date';
 
 export default function ApontamentoDetailScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
@@ -99,7 +100,7 @@ export default function ApontamentoDetailScreen() {
 
         <View style={styles.infoGrid}>
           <InfoItem icon="calendar-outline" label="Data" value={formatDate(apontamento.work_date)} />
-          <InfoItem icon="time-outline" label="Horário" value={`${apontamento.start_time} – ${apontamento.end_time}`} />
+          <InfoItem icon="time-outline" label="Horário" value={`${shortTime(apontamento.start_time)} – ${shortTime(apontamento.end_time)} (${formatDuration(apontamento.start_time, apontamento.end_time) || '—'})`} />
           <InfoItem icon="person-outline" label="Líder" value={apontamento.leader?.name ?? '—'} />
         </View>
 

@@ -4,11 +4,13 @@ import { StatusBar } from 'expo-status-bar';
 import { AuthProvider, useAuth } from '../contexts/AuthContext';
 import { View, ActivityIndicator } from 'react-native';
 import { Colors } from '../constants/colors';
+import { useAutoSync } from '../hooks/useAutoSync';
 
 function RootNavigator() {
   const { session, loading } = useAuth();
   const router = useRouter();
   const segments = useSegments();
+  useAutoSync();
 
   useEffect(() => {
     if (loading) return;

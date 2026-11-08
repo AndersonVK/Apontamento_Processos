@@ -13,16 +13,13 @@ import { useApontamentos } from '../../../hooks/useApontamentos';
 import { useAuth } from '../../../contexts/AuthContext';
 import { ApontamentoCard } from '../../../components/apontamento/ApontamentoCard';
 import { Colors } from '../../../constants/colors';
+import { daysAgoIso } from '../../../lib/date';
 
 const DAYS = 7;
 
-function formatDate(date: Date): string {
-  return date.toISOString().slice(0, 10);
-}
-
 function labelDate(iso: string): string {
-  const today = formatDate(new Date());
-  const yesterday = formatDate(new Date(Date.now() - 86400000));
+  const today = daysAgoIso(0);
+  const yesterday = daysAgoIso(1);
   if (iso === today) return 'Hoje';
   if (iso === yesterday) return 'Ontem';
   const [, m, d] = iso.split('-');
@@ -32,13 +29,10 @@ function labelDate(iso: string): string {
 export default function ApontamentosScreen() {
   const router = useRouter();
   const { profile } = useAuth();
-  const [selectedDate, setSelectedDate] = useState(formatDate(new Date()));
+  const [selectedDate, setSelectedDate] = useState(daysAgoIso(0));
   const { apontamentos, loading, reload } = useApontamentos(selectedDate);
 
-  const dates = Array.from({ length: DAYS }, (_, i) => {
-    const d = new Date(Date.now() - i * 86400000);
-    return formatDate(d);
-  });
+  const dates = Array.from({ length: DAYS }, (_, i) => daysAgoIso(i));
 
   const canAdd = profile?.role === 'leader' || profile?.role === 'manager' || profile?.role === 'director';
 
@@ -90,7 +84,7 @@ export default function ApontamentosScreen() {
         renderItem={({ item }) => (
           <ApontamentoCard
             apontamento={item}
-            onPress={() => router.push(`/apontamentos/${item.id}`)}
+            onPress={item.synced ? () => router.push(`/apontamentos/${item.id}`) : undefined}
           />
         )}
         ListEmptyComponent={

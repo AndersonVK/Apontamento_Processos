@@ -13,6 +13,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { supabase } from '../../../lib/supabase';
 import { Colors } from '../../../constants/colors';
 import { Card } from '../../../components/ui/Card';
+import { daysAgoIso } from '../../../lib/date';
 
 interface DailySummary {
   activity_name: string;
@@ -27,8 +28,8 @@ interface EmployeeSummary {
 }
 
 function getDateRange(days: number): { start: string; end: string } {
-  const end = new Date().toISOString().slice(0, 10);
-  const start = new Date(Date.now() - (days - 1) * 86400000).toISOString().slice(0, 10);
+  const end = daysAgoIso(0);
+  const start = daysAgoIso(days - 1);
   return { start, end };
 }
 

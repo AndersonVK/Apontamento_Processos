@@ -4,6 +4,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { Apontamento } from '../../types';
 import { Card } from '../ui/Card';
 import { Colors } from '../../constants/colors';
+import { shortTime, formatDuration } from '../../lib/date';
 
 interface ApontamentoCardProps {
   apontamento: Apontamento;
@@ -40,7 +41,8 @@ export function ApontamentoCard({ apontamento, onPress }: ApontamentoCardProps) 
           <View style={styles.timeItem}>
             <Ionicons name="time-outline" size={14} color={Colors.gray500} />
             <Text style={styles.timeText}>
-              {apontamento.start_time} – {apontamento.end_time}
+              {shortTime(apontamento.start_time)} – {shortTime(apontamento.end_time)}
+              {formatDuration(apontamento.start_time, apontamento.end_time) ? `  (${formatDuration(apontamento.start_time, apontamento.end_time)})` : ''}
             </Text>
           </View>
         </View>

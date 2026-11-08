@@ -91,3 +91,10 @@ export interface ApontamentoFormData {
   notes: string;
   field_values: Record<string, string>;
 }
+
+/** Dados de exibição guardados junto do registro offline (para listar sem internet). */
+export interface OfflineMeta {
+  employee_name: string;
+  activity_name: string;
+  fields: { field_id: string; name: string; value: string; unit: string | null; field_type: FieldType }[];
+}

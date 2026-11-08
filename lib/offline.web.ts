@@ -1,5 +1,5 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { ApontamentoFormData } from '../types';
+import { ApontamentoFormData, OfflineMeta } from '../types';
 
 // Versão web da fila offline: usa o armazenamento do navegador (expo-sqlite
 // no web é experimental). A API é idêntica à de offline.ts.
@@ -19,6 +19,7 @@ export interface OfflineApontamento {
   synced: boolean;
   created_at: string;
   retry_count: number;
+  meta: OfflineMeta;
 }
 
 async function readAll(): Promise<OfflineApontamento[]> {
@@ -32,7 +33,8 @@ async function writeAll(items: OfflineApontamento[]) {
 
 export async function saveOffline(
   data: ApontamentoFormData,
-  leaderId: string
+  leaderId: string,
+  meta: OfflineMeta
 ): Promise<string> {
   const id = `local_${Date.now()}_${Math.random().toString(36).slice(2)}`;
   const items = await readAll();
@@ -49,6 +51,7 @@ export async function saveOffline(
     synced: false,
     created_at: new Date().toISOString(),
     retry_count: 0,
+    meta,
   });
   await writeAll(items);
   return id;

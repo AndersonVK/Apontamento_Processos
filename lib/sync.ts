@@ -7,9 +7,31 @@ import {
   OfflineApontamento,
 } from './offline';
 
-async function syncOne(item: OfflineApontamento): Promise<boolean> {
+const MAX_SERVER_REJECTIONS = 5;
+
+type Listener = () => void;
+const listeners = new Set<Listener>();
+
+/** Avisa telas (ex.: lista) que a fila mudou ou que algo foi sincronizado. */
+export function onQueueChange(cb: Listener): () => void {
+  listeners.add(cb);
+  return () => listeners.delete(cb);
+}
+
+export function notifyQueueChange() {
+  listeners.forEach((cb) => cb());
+}
+
+/** Erro sem código do Postgres/PostgREST = falha de rede (não é culpa do registro). */
+export function isNetworkError(err: any): boolean {
+  return !!err && !err.code && !err.status;
+}
+
+async function syncOne(item: OfflineApontamento): Promise<'ok' | 'network' | 'rejected'> {
   try {
-    const { data: apontamento, error } = await supabase
+    let apontamentoId: string | null = null;
+
+    const { data, error } = await supabase
       .from('apontamentos')
       .insert({
         local_id: item.id,
@@ -24,17 +46,35 @@ async function syncOne(item: OfflineApontamento): Promise<boolean> {
       .select('id')
       .single();
 
-    if (error) throw error;
+    if (error) {
+      // 23505 = local_id já existe: uma tentativa anterior inseriu o registro mas
+      // falhou depois. Reaproveita o registro em vez de duplicar.
+      if (error.code === '23505') {
+        const { data: existing, error: selErr } = await supabase
+          .from('apontamentos')
+          .select('id')
+          .eq('local_id', item.id)
+          .single();
+        if (selErr || !existing) throw selErr ?? error;
+        apontamentoId = existing.id;
+      } else {
+        throw error;
+      }
+    } else {
+      apontamentoId = data.id;
+    }
 
-    const fieldValues = Object.entries(item.field_values).map(
-      ([field_id, value]) => ({
-        apontamento_id: apontamento.id,
-        field_id,
-        value,
-      })
-    );
+    const { count, error: cntErr } = await supabase
+      .from('apontamento_field_values')
+      .select('id', { count: 'exact', head: true })
+      .eq('apontamento_id', apontamentoId);
+    if (cntErr) throw cntErr;
 
-    if (fieldValues.length > 0) {
+    const fieldValues = Object.entries(item.field_values)
+      .filter(([, v]) => v !== '')
+      .map(([field_id, value]) => ({ apontamento_id: apontamentoId, field_id, value }));
+
+    if ((count ?? 0) === 0 && fieldValues.length > 0) {
       const { error: fvError } = await supabase
         .from('apontamento_field_values')
         .insert(fieldValues);
@@ -42,30 +82,38 @@ async function syncOne(item: OfflineApontamento): Promise<boolean> {
     }
 
     await markSynced(item.id);
-    return true;
-  } catch {
+    return 'ok';
+  } catch (err: any) {
+    if (isNetworkError(err)) return 'network';
     await incrementRetry(item.id);
-    return false;
+    return 'rejected';
   }
 }
 
-export async function syncPending(): Promise<{
-  synced: number;
-  failed: number;
-}> {
-  const state = await NetInfo.fetch();
-  if (!state.isConnected) return { synced: 0, failed: 0 };
+let running = false;
 
-  const pending = await getPendingSync();
-  let synced = 0;
-  let failed = 0;
+export async function syncPending(): Promise<{ synced: number; failed: number }> {
+  if (running) return { synced: 0, failed: 0 };
+  running = true;
+  try {
+    const state = await NetInfo.fetch();
+    if (state.isConnected === false) return { synced: 0, failed: 0 };
 
-  for (const item of pending) {
-    if (item.retry_count >= 5) continue;
-    const ok = await syncOne(item);
-    if (ok) synced++;
-    else failed++;
+    const pending = await getPendingSync();
+    let synced = 0;
+    let failed = 0;
+
+    for (const item of pending) {
+      if (item.retry_count >= MAX_SERVER_REJECTIONS) continue;
+      const result = await syncOne(item);
+      if (result === 'ok') synced++;
+      else failed++;
+      if (result === 'network') break; // sem rede de verdade: tenta de novo depois
+    }
+
+    if (synced > 0) notifyQueueChange();
+    return { synced, failed };
+  } finally {
+    running = false;
   }
-
-  return { synced, failed };
 }

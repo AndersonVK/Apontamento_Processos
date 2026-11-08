@@ -1,5 +1,5 @@
 import * as SQLite from 'expo-sqlite';
-import { ApontamentoFormData } from '../types';
+import { ApontamentoFormData, OfflineMeta } from '../types';
 
 let db: SQLite.SQLiteDatabase | null = null;
 
@@ -26,9 +26,14 @@ async function initSchema(db: SQLite.SQLiteDatabase) {
       field_values TEXT NOT NULL DEFAULT '{}',
       synced INTEGER NOT NULL DEFAULT 0,
       created_at TEXT NOT NULL,
-      retry_count INTEGER NOT NULL DEFAULT 0
+      retry_count INTEGER NOT NULL DEFAULT 0,
+      meta TEXT NOT NULL DEFAULT '{}'
     );
   `);
+  // bancos criados antes da coluna meta
+  try {
+    await db.execAsync(`ALTER TABLE offline_apontamentos ADD COLUMN meta TEXT NOT NULL DEFAULT '{}'`);
+  } catch {}
 }
 
 export interface OfflineApontamento {
@@ -44,11 +49,13 @@ export interface OfflineApontamento {
   synced: boolean;
   created_at: string;
   retry_count: number;
+  meta: OfflineMeta;
 }
 
 export async function saveOffline(
   data: ApontamentoFormData,
-  leaderId: string
+  leaderId: string,
+  meta: OfflineMeta
 ): Promise<string> {
   const db = await getDb();
   const id = `local_${Date.now()}_${Math.random().toString(36).slice(2)}`;
@@ -56,8 +63,8 @@ export async function saveOffline(
 
   await db.runAsync(
     `INSERT INTO offline_apontamentos
-      (id, employee_id, activity_id, leader_id, work_date, start_time, end_time, notes, field_values, synced, created_at)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 0, ?)`,
+      (id, employee_id, activity_id, leader_id, work_date, start_time, end_time, notes, field_values, synced, created_at, meta)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 0, ?, ?)`,
     [
       id,
       data.employee_id,
@@ -69,6 +76,7 @@ export async function saveOffline(
       data.notes || null,
       JSON.stringify(data.field_values),
       now,
+      JSON.stringify(meta),
     ]
   );
   return id;
@@ -82,6 +90,7 @@ export async function getPendingSync(): Promise<OfflineApontamento[]> {
   return rows.map((r) => ({
     ...r,
     field_values: JSON.parse(r.field_values || '{}'),
+    meta: JSON.parse(r.meta || '{}'),
     synced: r.synced === 1,
   }));
 }

@@ -11,7 +11,8 @@ import {
 import { useRouter } from 'expo-router';
 import { supabase } from '../../../lib/supabase';
 import { saveOffline } from '../../../lib/offline';
-import { syncPending } from '../../../lib/sync';
+import { syncPending, notifyQueueChange, isNetworkError } from '../../../lib/sync';
+import { localDateIso, durationMinutes } from '../../../lib/date';
 import { useAuth } from '../../../contexts/AuthContext';
 import { useEmployees } from '../../../hooks/useEmployees';
 import { useActivities } from '../../../hooks/useActivities';
@@ -25,13 +26,13 @@ import { Colors } from '../../../constants/colors';
 import NetInfo from '@react-native-community/netinfo';
 
 function todayIso() {
-  return new Date().toISOString().slice(0, 10);
+  return localDateIso();
 }
 
 export default function NewApontamentoScreen() {
   const router = useRouter();
   const { profile } = useAuth();
-  const { employees, loading: loadingEmp } = useEmployees(profile?.role === 'leader');
+  const { employees, loading: loadingEmp } = useEmployees(false);
   const { activities, loading: loadingAct } = useActivities();
 
   const [form, setForm] = useState<ApontamentoFormData>({
@@ -69,6 +70,9 @@ export default function NewApontamentoScreen() {
     if (!form.activity_id) errs.activity_id = 'Selecione uma atividade';
     if (!form.start_time) errs.start_time = 'Informe o horário de início';
     if (!form.end_time) errs.end_time = 'Informe o horário de término';
+    if (form.start_time && form.end_time && durationMinutes(form.start_time, form.end_time) === null) {
+      errs.end_time = 'O término deve ser depois do início';
+    }
 
     const fields = selectedActivity?.fields ?? [];
     for (const f of fields) {
@@ -85,38 +89,64 @@ export default function NewApontamentoScreen() {
     if (!validate() || !profile) return;
     setSaving(true);
 
+    const meta = {
+      employee_name: employees.find((e) => e.id === form.employee_id)?.name ?? 'Funcionário',
+      activity_name: selectedActivity?.name ?? 'Atividade',
+      fields: (selectedActivity?.fields ?? [])
+        .filter((f) => (form.field_values[f.id] ?? '') !== '')
+        .map((f) => {
+          const raw = form.field_values[f.id];
+          const value =
+            f.field_type === 'select'
+              ? f.options?.find((o) => o.value === raw)?.label ?? raw
+              : raw;
+          return { field_id: f.id, name: f.name, value, unit: f.unit, field_type: f.field_type };
+        }),
+    };
+
+    async function saveLocally() {
+      await saveOffline(form, profile!.id, meta);
+      notifyQueueChange();
+    }
+
     try {
       const net = await NetInfo.fetch();
 
-      if (net.isConnected) {
-        const { data: ap, error } = await supabase
-          .from('apontamentos')
-          .insert({
-            employee_id: form.employee_id,
-            activity_id: form.activity_id,
-            leader_id: profile.id,
-            work_date: form.work_date,
-            start_time: form.start_time,
-            end_time: form.end_time,
-            notes: form.notes || null,
-          })
-          .select('id')
-          .single();
-
-        if (error) throw error;
-
-        const fieldEntries = Object.entries(form.field_values)
-          .filter(([, v]) => v !== '')
-          .map(([field_id, value]) => ({ apontamento_id: ap.id, field_id, value }));
-
-        if (fieldEntries.length > 0) {
-          const { error: fvErr } = await supabase
-            .from('apontamento_field_values')
-            .insert(fieldEntries);
-          if (fvErr) throw fvErr;
-        }
+      if (net.isConnected === false) {
+        await saveLocally();
       } else {
-        await saveOffline(form, profile.id);
+        try {
+          const { data: ap, error } = await supabase
+            .from('apontamentos')
+            .insert({
+              employee_id: form.employee_id,
+              activity_id: form.activity_id,
+              leader_id: profile.id,
+              work_date: form.work_date,
+              start_time: form.start_time,
+              end_time: form.end_time,
+              notes: form.notes || null,
+            })
+            .select('id')
+            .single();
+          if (error) throw error;
+
+          const fieldEntries = Object.entries(form.field_values)
+            .filter(([, v]) => v !== '')
+            .map(([field_id, value]) => ({ apontamento_id: ap.id, field_id, value }));
+
+          if (fieldEntries.length > 0) {
+            const { error: fvErr } = await supabase
+              .from('apontamento_field_values')
+              .insert(fieldEntries);
+            if (fvErr) throw fvErr;
+          }
+          notifyQueueChange();
+        } catch (e: any) {
+          // sinal ruim (conectado mas sem alcançar o servidor): guarda no aparelho
+          if (isNetworkError(e)) await saveLocally();
+          else throw e;
+        }
       }
 
       if (addAnother) {
@@ -138,7 +168,18 @@ export default function NewApontamentoScreen() {
     }
   }
 
-  const employeeOptions = employees.map((e) => ({ label: e.name, value: e.id }));
+  const myTeam = profile?.team_id ?? null;
+  const employeeOptions = [...employees]
+    .sort(
+      (a, b) =>
+        Number(b.team_id === myTeam && !!myTeam) - Number(a.team_id === myTeam && !!myTeam) ||
+        a.name.localeCompare(b.name)
+    )
+    .map((e) => {
+      const mine = !!myTeam && e.team_id === myTeam;
+      const label = mine ? e.name : `${e.name} · ${e.team?.name ?? 'sem equipe'}`;
+      return { label, value: e.id };
+    });
   const activityOptions = activities.map((a) => ({ label: a.name, value: a.id }));
 
   return (
