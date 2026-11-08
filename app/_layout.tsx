@@ -16,7 +16,7 @@ function RootNavigator() {
     if (!session && !inAuth) {
       router.replace('/(auth)/login');
     } else if (session && inAuth) {
-      router.replace('/(tabs)');
+      router.replace('/(tabs)/apontamentos');
     }
   }, [session, loading]);
 
@@ -30,6 +30,7 @@ function RootNavigator() {
 
   return (
     <Stack screenOptions={{ headerShown: false }}>
+      <Stack.Screen name="index" />
       <Stack.Screen name="(auth)" />
       <Stack.Screen name="(tabs)" />
     </Stack>
