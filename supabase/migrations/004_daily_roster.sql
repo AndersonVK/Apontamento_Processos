@@ -52,7 +52,7 @@ CREATE TABLE IF NOT EXISTS idle_blocks (
   work_date DATE NOT NULL,
   start_time TIME NOT NULL,
   end_time TIME NOT NULL,
-  reason_type TEXT NOT NULL CHECK (reason_type IN ('parado', 'deslocamento', 'outro')),
+  reason_type TEXT NOT NULL CHECK (reason_type IN ('parado', 'deslocamento', 'chegou_atrasado', 'saiu_mais_cedo', 'outro')),
   note TEXT,
   created_by UUID REFERENCES profiles(id),
   created_at TIMESTAMPTZ DEFAULT NOW(),

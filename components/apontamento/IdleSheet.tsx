@@ -10,6 +10,8 @@ import { durationMinutes } from '../../lib/date';
 export const IDLE_LABELS: Record<IdleReason, string> = {
   parado: 'Parado',
   deslocamento: 'Deslocamento',
+  chegou_atrasado: 'Chegou atrasado',
+  saiu_mais_cedo: 'Saiu mais cedo',
   outro: 'Outro',
 };
 

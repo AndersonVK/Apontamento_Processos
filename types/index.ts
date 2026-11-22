@@ -109,7 +109,7 @@ export interface OfflineMeta {
 }
 
 export type AbsenceReason = 'atestado' | 'sem_justificativa' | 'outro';
-export type IdleReason = 'parado' | 'deslocamento' | 'outro';
+export type IdleReason = 'parado' | 'deslocamento' | 'chegou_atrasado' | 'saiu_mais_cedo' | 'outro';
 
 export interface Absence {
   id?: string;
