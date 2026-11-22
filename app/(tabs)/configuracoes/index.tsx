@@ -5,12 +5,12 @@ import {
   StyleSheet,
   ScrollView,
   TouchableOpacity,
-  Alert,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import { useAuth } from '../../../contexts/AuthContext';
 import { Colors } from '../../../constants/colors';
+import { showMessage, confirmAction } from '../../../lib/dialog';
 
 const ROLE_LABELS: Record<string, string> = {
   director: 'Diretor',
@@ -24,11 +24,8 @@ export default function ConfiguracoesScreen() {
   const router = useRouter();
   const canManage = profile?.role === 'director' || profile?.role === 'manager';
 
-  function handleSignOut() {
-    Alert.alert('Sair', 'Deseja sair da conta?', [
-      { text: 'Cancelar', style: 'cancel' },
-      { text: 'Sair', style: 'destructive', onPress: signOut },
-    ]);
+  async function handleSignOut() {
+    if (await confirmAction('Sair', 'Deseja sair da conta?', 'Sair', true)) signOut();
   }
 
   return (

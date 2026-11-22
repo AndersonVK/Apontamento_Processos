@@ -4,7 +4,6 @@ import {
   Text,
   StyleSheet,
   ScrollView,
-  Alert,
   KeyboardAvoidingView,
   Platform,
 } from 'react-native';
@@ -14,13 +13,20 @@ import { Team } from '../../../types';
 import { Input } from '../../../components/ui/Input';
 import { Select } from '../../../components/ui/Select';
 import { Button } from '../../../components/ui/Button';
+import { CheckRow } from '../../../components/ui/Sheet';
+import { ScheduleFields, ScheduleValue, validateSchedule } from '../../../components/apontamento/ScheduleFields';
+import { shortTime } from '../../../lib/date';
 import { Colors } from '../../../constants/colors';
+import { showMessage, confirmAction } from '../../../lib/dialog';
 
 export default function NewFuncionarioScreen() {
   const router = useRouter();
   const [name, setName] = useState('');
   const [registration, setRegistration] = useState('');
   const [teamId, setTeamId] = useState('');
+  const [custom, setCustom] = useState(false);
+  const [schedule, setSchedule] = useState<ScheduleValue>({ start: '07:00', end: '17:00', breakStart: '12:00', breakEnd: '13:00' });
+  const [scheduleError, setScheduleError] = useState('');
   const [teams, setTeams] = useState<Team[]>([]);
   const [saving, setSaving] = useState(false);
   const [errors, setErrors] = useState<Record<string, string>>({});
@@ -36,14 +42,27 @@ export default function NewFuncionarioScreen() {
     if (!name.trim()) errs.name = 'Nome obrigatório';
     if (Object.keys(errs).length) { setErrors(errs); return; }
 
+    const schedErr = custom ? validateSchedule(schedule) : '';
+    setScheduleError(schedErr);
+    if (schedErr) return;
+
     setSaving(true);
     const { error } = await supabase.from('employees').insert({
       name: name.trim(),
       registration: registration.trim() || null,
       team_id: teamId || null,
+      // só envia a jornada quando é personalizada (não depende das colunas novas no caso comum)
+      ...(custom
+        ? {
+            custom_schedule: true,
+            shift_start: schedule.start,
+            shift_end: schedule.end,
+            break_start: schedule.breakStart || null,
+            break_end: schedule.breakEnd || null,
+          }
+        : {}),
     });
-
-    if (error) Alert.alert('Erro', error.message);
+    if (error) showMessage('Erro', error.message);
     else router.back();
     setSaving(false);
   }
@@ -78,6 +97,15 @@ export default function NewFuncionarioScreen() {
           value={teamId}
           onChange={setTeamId}
         />
+
+        <CheckRow
+          label="Horário diferente do da equipe"
+          checked={custom}
+          onPress={() => { setCustom((v) => !v); setScheduleError(''); }}
+        />
+        {custom && (
+          <ScheduleFields value={schedule} onChange={(v) => { setSchedule(v); setScheduleError(''); }} error={scheduleError} />
+        )}
 
         <Button
           title="Cadastrar"

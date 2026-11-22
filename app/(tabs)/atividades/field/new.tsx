@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { View, Text, StyleSheet, ScrollView, Alert, TouchableOpacity } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, TouchableOpacity } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { supabase } from '../../../../lib/supabase';
@@ -8,6 +8,7 @@ import { Input } from '../../../../components/ui/Input';
 import { Select } from '../../../../components/ui/Select';
 import { Button } from '../../../../components/ui/Button';
 import { Colors } from '../../../../constants/colors';
+import { showMessage, confirmAction } from '../../../../lib/dialog';
 
 export default function NewFieldScreen() {
   const { activityId } = useLocalSearchParams<{ activityId: string }>();
@@ -66,7 +67,7 @@ export default function NewFieldScreen() {
       }
       router.back();
     } catch (e: any) {
-      Alert.alert('Erro', e?.message ?? 'Não foi possível salvar o campo.');
+      showMessage('Erro', e?.message ?? 'Não foi possível salvar o campo.');
     } finally {
       setSaving(false);
     }

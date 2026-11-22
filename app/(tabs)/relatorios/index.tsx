@@ -6,7 +6,6 @@ import {
   ScrollView,
   TouchableOpacity,
   RefreshControl,
-  Alert,
   Platform,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
@@ -14,6 +13,7 @@ import { supabase } from '../../../lib/supabase';
 import { Colors } from '../../../constants/colors';
 import { Card } from '../../../components/ui/Card';
 import { daysAgoIso } from '../../../lib/date';
+import { showMessage, confirmAction } from '../../../lib/dialog';
 
 interface DailySummary {
   activity_name: string;
@@ -98,7 +98,7 @@ export default function RelatoriosScreen() {
     <View style={styles.container}>
       <View style={styles.header}>
         <Text style={styles.title}>Relatórios</Text>
-        <TouchableOpacity onPress={() => Alert.alert('Em breve', 'Export para Excel/PDF em desenvolvimento.')}>
+        <TouchableOpacity onPress={() => showMessage('Em breve', 'Export para Excel/PDF em desenvolvimento.')}>
           <Ionicons name="download-outline" size={22} color={Colors.primary} />
         </TouchableOpacity>
       </View>

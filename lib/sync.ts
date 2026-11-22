@@ -9,18 +9,9 @@ import {
 
 const MAX_SERVER_REJECTIONS = 5;
 
-type Listener = () => void;
-const listeners = new Set<Listener>();
-
-/** Avisa telas (ex.: lista) que a fila mudou ou que algo foi sincronizado. */
-export function onQueueChange(cb: Listener): () => void {
-  listeners.add(cb);
-  return () => listeners.delete(cb);
-}
-
-export function notifyQueueChange() {
-  listeners.forEach((cb) => cb());
-}
+export { onQueueChange, notifyQueueChange } from './events';
+import { notifyQueueChange } from './events';
+import { getOutbox, removeOp, markRejected, CONFLICT_KEYS } from './outbox';
 
 /** Erro sem código do Postgres/PostgREST = falha de rede (não é culpa do registro). */
 export function isNetworkError(err: any): boolean {
@@ -90,10 +81,43 @@ async function syncOne(item: OfflineApontamento): Promise<'ok' | 'network' | 're
   }
 }
 
+async function flushOutbox(): Promise<{ synced: number; failed: number }> {
+  const ops = await getOutbox();
+  let synced = 0;
+  let failed = 0;
+  for (const op of ops) {
+    if (op.rejections >= MAX_SERVER_REJECTIONS) continue;
+    try {
+      if (op.op === 'upsert' && op.row) {
+        const { error } = await supabase
+          .from(op.table)
+          .upsert(op.row, { onConflict: CONFLICT_KEYS[op.table] });
+        if (error) throw error;
+      } else if (op.op === 'delete' && op.match) {
+        let q = supabase.from(op.table).delete();
+        for (const [col, val] of Object.entries(op.match)) q = q.eq(col, val);
+        const { error } = await q;
+        if (error) throw error;
+      }
+      await removeOp(op.id);
+      synced++;
+    } catch (err: any) {
+      if (isNetworkError(err)) break; // sem rede de verdade: tenta de novo depois
+      await markRejected(op.id, err?.message ?? 'Erro desconhecido');
+      failed++;
+    }
+  }
+  return { synced, failed };
+}
+
 let running = false;
+let rerun = false; // um gatilho chegou durante um envio em andamento: repete ao terminar
 
 export async function syncPending(): Promise<{ synced: number; failed: number }> {
-  if (running) return { synced: 0, failed: 0 };
+  if (running) {
+    rerun = true;
+    return { synced: 0, failed: 0 };
+  }
   running = true;
   try {
     const state = await NetInfo.fetch();
@@ -111,9 +135,17 @@ export async function syncPending(): Promise<{ synced: number; failed: number }>
       if (result === 'network') break; // sem rede de verdade: tenta de novo depois
     }
 
+    const outboxResult = await flushOutbox();
+    synced += outboxResult.synced;
+    failed += outboxResult.failed;
+
     if (synced > 0) notifyQueueChange();
     return { synced, failed };
   } finally {
     running = false;
+    if (rerun) {
+      rerun = false;
+      syncPending().catch(() => {});
+    }
   }
 }

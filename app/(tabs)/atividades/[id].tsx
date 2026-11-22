@@ -4,7 +4,6 @@ import {
   Text,
   StyleSheet,
   ScrollView,
-  Alert,
   KeyboardAvoidingView,
   Platform,
   TouchableOpacity,
@@ -18,6 +17,7 @@ import { Select } from '../../../components/ui/Select';
 import { Button } from '../../../components/ui/Button';
 import { Card } from '../../../components/ui/Card';
 import { Colors } from '../../../constants/colors';
+import { showMessage, confirmAction } from '../../../lib/dialog';
 
 export default function EditAtividadeScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
@@ -48,17 +48,13 @@ export default function EditAtividadeScreen() {
   }
 
   async function handleDeactivate() {
-    Alert.alert('Desativar', `Desativar atividade "${activity?.name}"?`, [
-      { text: 'Cancelar', style: 'cancel' },
-      {
-        text: 'Desativar',
-        style: 'destructive',
-        onPress: async () => {
-          await supabase.from('activities').update({ active: false }).eq('id', id);
-          router.back();
-        },
-      },
-    ]);
+    if (!(await confirmAction('Desativar', `Desativar atividade "${activity?.name}"?`, 'Desativar', true))) return;
+    const { error } = await supabase.from('activities').update({ active: false }).eq('id', id);
+    if (error) {
+      showMessage('Erro', error.message);
+      return;
+    }
+    router.back();
   }
 
   if (!activity) return null;
@@ -103,24 +99,16 @@ export default function EditAtividadeScreen() {
 
 function FieldRow({ field, onDelete }: { field: ActivityField; onDelete: () => void }) {
   async function del() {
-    Alert.alert('Remover', `Remover campo "${field.name}"?`, [
-      { text: 'Cancelar', style: 'cancel' },
-      {
-        text: 'Remover',
-        style: 'destructive',
-        onPress: async () => {
-          const { error } = await supabase.from('activity_fields').delete().eq('id', field.id);
-          if (error) {
-            Alert.alert(
-              'Não foi possível remover',
-              'Este campo já foi usado em apontamentos. Para preservar o histórico, ele não pode ser removido.'
-            );
-            return;
-          }
-          onDelete();
-        },
-      },
-    ]);
+    if (!(await confirmAction('Remover', `Remover campo "${field.name}"?`, 'Remover', true))) return;
+    const { error } = await supabase.from('activity_fields').delete().eq('id', field.id);
+    if (error) {
+      showMessage(
+        'Não foi possível remover',
+        'Este campo já foi usado em apontamentos. Para preservar o histórico, ele não pode ser removido.'
+      );
+      return;
+    }
+    onDelete();
   }
 
   return (

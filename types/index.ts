@@ -14,6 +14,10 @@ export interface Team {
   name: string;
   leader_id: string | null;
   created_at: string;
+  shift_start?: string;
+  shift_end?: string;
+  break_start?: string | null;
+  break_end?: string | null;
 }
 
 export interface Employee {
@@ -24,6 +28,11 @@ export interface Employee {
   active: boolean;
   created_at: string;
   team?: Team;
+  custom_schedule?: boolean;
+  shift_start?: string | null;
+  shift_end?: string | null;
+  break_start?: string | null;
+  break_end?: string | null;
 }
 
 export type FieldType = 'number' | 'select';
@@ -97,4 +106,41 @@ export interface OfflineMeta {
   employee_name: string;
   activity_name: string;
   fields: { field_id: string; name: string; value: string; unit: string | null; field_type: FieldType }[];
+}
+
+export type AbsenceReason = 'atestado' | 'sem_justificativa' | 'outro';
+export type IdleReason = 'parado' | 'deslocamento' | 'outro';
+
+export interface Absence {
+  id?: string;
+  employee_id: string;
+  work_date: string;
+  reason_type: AbsenceReason;
+  note: string | null;
+  created_by?: string | null;
+}
+
+export interface IdleBlock {
+  id: string;
+  employee_id: string;
+  work_date: string;
+  start_time: string;
+  end_time: string;
+  reason_type: IdleReason;
+  note: string | null;
+  created_by?: string | null;
+}
+
+export interface TeamDay {
+  team_id: string;
+  work_date: string;
+  no_work: boolean;
+  reason: string | null;
+  custom_schedule: boolean;
+  shift_start: string | null;
+  shift_end: string | null;
+  break_start: string | null;
+  break_end: string | null;
+  closed_at: string | null;
+  closed_by: string | null;
 }

@@ -14,6 +14,7 @@ export default function ApontamentosLayout() {
     >
       <Stack.Screen name="index" options={{ headerShown: false }} />
       <Stack.Screen name="new" options={{ title: 'Novo apontamento' }} />
+      <Stack.Screen name="batch" options={{ title: 'Lançar para vários' }} />
       <Stack.Screen name="[id]" options={{ title: 'Apontamento' }} />
       <Stack.Screen name="edit/[id]" options={{ title: 'Editar apontamento' }} />
     </Stack>

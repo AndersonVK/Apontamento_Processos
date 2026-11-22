@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { Text, StyleSheet, ScrollView, Alert } from 'react-native';
+import { Text, StyleSheet, ScrollView } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { supabase } from '../../../../lib/supabase';
 import { useAuth } from '../../../../contexts/AuthContext';
@@ -9,6 +9,7 @@ import { Input } from '../../../../components/ui/Input';
 import { Select } from '../../../../components/ui/Select';
 import { Button } from '../../../../components/ui/Button';
 import { Colors } from '../../../../constants/colors';
+import { showMessage, confirmAction } from '../../../../lib/dialog';
 
 export default function UsuarioEditScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
@@ -58,7 +59,7 @@ export default function UsuarioEditScreen() {
       .select('id');
     setSaving(false);
     if (error || !data?.length) {
-      Alert.alert('Erro', error?.message ?? 'Sem permissão para alterar este usuário.');
+      showMessage('Erro', error?.message ?? 'Sem permissão para alterar este usuário.');
       return;
     }
     router.back();

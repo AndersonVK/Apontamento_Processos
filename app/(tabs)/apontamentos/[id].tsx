@@ -5,7 +5,6 @@ import {
   StyleSheet,
   ScrollView,
   ActivityIndicator,
-  Alert,
   TouchableOpacity,
 } from 'react-native';
 import { useLocalSearchParams, useRouter, useFocusEffect } from 'expo-router';
@@ -18,6 +17,7 @@ import { Button } from '../../../components/ui/Button';
 import { Colors } from '../../../constants/colors';
 import { notifyQueueChange } from '../../../lib/sync';
 import { shortTime, formatDuration } from '../../../lib/date';
+import { showMessage, confirmAction } from '../../../lib/dialog';
 
 export default function ApontamentoDetailScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
@@ -48,22 +48,14 @@ export default function ApontamentoDetailScreen() {
   useFocusEffect(useCallback(() => { load(); }, [id]));
 
   async function handleDelete() {
-    Alert.alert('Excluir', 'Deseja excluir este apontamento?', [
-      { text: 'Cancelar', style: 'cancel' },
-      {
-        text: 'Excluir',
-        style: 'destructive',
-        onPress: async () => {
-          const { error } = await supabase.from('apontamentos').delete().eq('id', id);
-          if (error) {
-            Alert.alert('Erro', error.message);
-            return;
-          }
-          notifyQueueChange();
-          router.back();
-        },
-      },
-    ]);
+    if (!(await confirmAction('Excluir', 'Deseja excluir este apontamento?', 'Excluir', true))) return;
+    const { error } = await supabase.from('apontamentos').delete().eq('id', id);
+    if (error) {
+      showMessage('Erro', error.message);
+      return;
+    }
+    notifyQueueChange();
+    router.back();
   }
 
   if (loading) {

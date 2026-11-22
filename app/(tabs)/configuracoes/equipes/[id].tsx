@@ -1,12 +1,15 @@
 import React, { useEffect, useState } from 'react';
-import { Text, StyleSheet, ScrollView, Alert } from 'react-native';
+import { Text, StyleSheet, ScrollView } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { supabase } from '../../../../lib/supabase';
 import { Profile } from '../../../../types';
 import { Input } from '../../../../components/ui/Input';
 import { Select } from '../../../../components/ui/Select';
 import { Button } from '../../../../components/ui/Button';
+import { ScheduleFields, ScheduleValue, validateSchedule } from '../../../../components/apontamento/ScheduleFields';
+import { shortTime } from '../../../../lib/date';
 import { Colors } from '../../../../constants/colors';
+import { showMessage, confirmAction } from '../../../../lib/dialog';
 
 export default function EquipeFormScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
@@ -18,6 +21,9 @@ export default function EquipeFormScreen() {
   const [candidates, setCandidates] = useState<Profile[]>([]);
   const [saving, setSaving] = useState(false);
   const [nameError, setNameError] = useState('');
+  const [schedule, setSchedule] = useState<ScheduleValue>({ start: '07:00', end: '17:00', breakStart: '12:00', breakEnd: '13:00' });
+  const [scheduleError, setScheduleError] = useState('');
+  const [sendSchedule, setSendSchedule] = useState(false);
 
   useEffect(() => {
     (async () => {
@@ -33,6 +39,13 @@ export default function EquipeFormScreen() {
           setName(t.name);
           setLeaderId(t.leader_id ?? '');
           setPreviousLeaderId(t.leader_id ?? '');
+          setSendSchedule(t.shift_start !== undefined);
+          setSchedule({
+            start: shortTime(t.shift_start ?? '07:00'),
+            end: shortTime(t.shift_end ?? '17:00'),
+            breakStart: shortTime(t.break_start ?? ''),
+            breakEnd: shortTime(t.break_end ?? ''),
+          });
         }
       }
     })();
@@ -43,10 +56,24 @@ export default function EquipeFormScreen() {
       setNameError('Nome obrigatório');
       return;
     }
+    const schedErr = validateSchedule(schedule);
+    setScheduleError(schedErr);
+    if (schedErr) return;
     setSaving(true);
     try {
       let teamId = isNew ? '' : (id as string);
-      const payload = { name: name.trim(), leader_id: leaderId || null };
+      const payload = {
+        name: name.trim(),
+        leader_id: leaderId || null,
+        ...(sendSchedule
+          ? {
+              shift_start: schedule.start,
+              shift_end: schedule.end,
+              break_start: schedule.breakStart || null,
+              break_end: schedule.breakEnd || null,
+            }
+          : {}),
+      };
 
       if (isNew) {
         const { data, error } = await supabase.from('teams').insert(payload).select('id').single();
@@ -68,7 +95,7 @@ export default function EquipeFormScreen() {
       }
       router.back();
     } catch (e: any) {
-      Alert.alert('Erro', e?.message ?? 'Não foi possível salvar a equipe.');
+      showMessage('Erro', e?.message ?? 'Não foi possível salvar a equipe.');
     } finally {
       setSaving(false);
     }
@@ -92,6 +119,8 @@ export default function EquipeFormScreen() {
         value={leaderId}
         onChange={setLeaderId}
       />
+      <Text style={styles.sectionTitle}>Jornada padrão da equipe</Text>
+      <ScheduleFields value={schedule} onChange={(v) => { setSchedule(v); setSendSchedule(true); setScheduleError(''); }} error={scheduleError} />
       <Text style={styles.hint}>
         Só aparecem quem tem perfil Líder ou Gerente. Para alguém aparecer aqui, defina o perfil em Configurações → Usuários.
         Os funcionários entram na equipe pela tela Funcionários.
@@ -105,5 +134,6 @@ const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: Colors.background },
   content: { padding: 16, gap: 16, paddingBottom: 40 },
   title: { fontSize: 22, fontWeight: '700', color: Colors.text },
+  sectionTitle: { fontSize: 15, fontWeight: '700', color: Colors.text },
   hint: { fontSize: 12, color: Colors.textSecondary, lineHeight: 18 },
 });

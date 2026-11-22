@@ -4,7 +4,6 @@ import {
   Text,
   StyleSheet,
   ScrollView,
-  Alert,
   KeyboardAvoidingView,
   Platform,
   TouchableOpacity,
@@ -18,6 +17,7 @@ import { Select } from '../../../components/ui/Select';
 import { Button } from '../../../components/ui/Button';
 import { Card } from '../../../components/ui/Card';
 import { Colors } from '../../../constants/colors';
+import { showMessage, confirmAction } from '../../../lib/dialog';
 
 interface DraftField {
   localId: string;
@@ -89,7 +89,7 @@ export default function NewAtividadeScreen() {
       .select('id')
       .single();
 
-    if (error) { Alert.alert('Erro', error.message); setSaving(false); return; }
+    if (error) { showMessage('Erro', error.message); setSaving(false); return; }
 
     for (let i = 0; i < fields.length; i++) {
       const f = fields[i];

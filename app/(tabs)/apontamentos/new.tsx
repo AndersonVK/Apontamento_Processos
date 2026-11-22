@@ -6,13 +6,13 @@ import {
   ScrollView,
   KeyboardAvoidingView,
   Platform,
-  Alert,
 } from 'react-native';
-import { useRouter } from 'expo-router';
+import { useRouter, useLocalSearchParams } from 'expo-router';
 import { supabase } from '../../../lib/supabase';
-import { saveOffline } from '../../../lib/offline';
-import { syncPending, notifyQueueChange, isNetworkError } from '../../../lib/sync';
-import { localDateIso, durationMinutes } from '../../../lib/date';
+import { submitApontamento, buildMeta, lastActivityKey } from '../../../lib/apontamentoService';
+import { cacheGet } from '../../../lib/cache';
+import { toMin } from '../../../lib/coverage';
+import { localDateIso, durationMinutes, shortTime } from '../../../lib/date';
 import { useAuth } from '../../../contexts/AuthContext';
 import { useEmployees } from '../../../hooks/useEmployees';
 import { useActivities } from '../../../hooks/useActivities';
@@ -23,7 +23,7 @@ import { Input } from '../../../components/ui/Input';
 import { TimePicker } from '../../../components/ui/TimePicker';
 import { DynamicFields } from '../../../components/apontamento/DynamicFields';
 import { Colors } from '../../../constants/colors';
-import NetInfo from '@react-native-community/netinfo';
+import { showMessage, confirmAction } from '../../../lib/dialog';
 
 function todayIso() {
   return localDateIso();
@@ -31,16 +31,23 @@ function todayIso() {
 
 export default function NewApontamentoScreen() {
   const router = useRouter();
+  const params = useLocalSearchParams<{
+    employee_id?: string;
+    work_date?: string;
+    start_time?: string;
+    end_time?: string;
+    activity_id?: string;
+  }>();
   const { profile } = useAuth();
   const { employees, loading: loadingEmp } = useEmployees(false);
   const { activities, loading: loadingAct } = useActivities();
 
   const [form, setForm] = useState<ApontamentoFormData>({
-    employee_id: '',
-    activity_id: '',
-    work_date: todayIso(),
-    start_time: '07:00',
-    end_time: '17:00',
+    employee_id: params.employee_id ?? '',
+    activity_id: params.activity_id ?? '',
+    work_date: params.work_date ?? todayIso(),
+    start_time: params.start_time ?? '07:00',
+    end_time: params.end_time ?? '17:00',
     notes: '',
     field_values: {},
   });
@@ -48,6 +55,13 @@ export default function NewApontamentoScreen() {
   const [errors, setErrors] = useState<Partial<Record<keyof ApontamentoFormData | string, string>>>({});
   const [saving, setSaving] = useState(false);
   const [addAnother, setAddAnother] = useState(false);
+
+  useEffect(() => {
+    if (form.activity_id || !profile) return;
+    cacheGet<string>(lastActivityKey(profile.id)).then((id) => {
+      if (id) setForm((f) => (f.activity_id ? f : { ...f, activity_id: id }));
+    });
+  }, [profile?.id]);
 
   const selectedActivity = activities.find((a) => a.id === form.activity_id);
 
@@ -85,84 +99,63 @@ export default function NewApontamentoScreen() {
     return Object.keys(errs).length === 0;
   }
 
+  /** Avisa de sobreposição de horário e de falta registrada. true = pode salvar. */
+  async function confirmConflicts(): Promise<boolean> {
+    try {
+      const [ap, idle, abs] = await Promise.all([
+        supabase.from('apontamentos').select('start_time, end_time').eq('employee_id', form.employee_id).eq('work_date', form.work_date),
+        supabase.from('idle_blocks').select('start_time, end_time').eq('employee_id', form.employee_id).eq('work_date', form.work_date),
+        supabase.from('absences').select('reason_type').eq('employee_id', form.employee_id).eq('work_date', form.work_date),
+      ]);
+      const s0 = toMin(form.start_time);
+      const e0 = toMin(form.end_time);
+      const existing = [...((ap.data as any[]) ?? []), ...((idle.error ? [] : (idle.data as any[])) ?? [])];
+      const clash = existing.find((x) => {
+        const xs = toMin(x.start_time);
+        const xe = toMin(x.end_time);
+        return xs !== null && xe !== null && s0 !== null && e0 !== null && xs < e0 && xe > s0;
+      });
+      if (clash) {
+        const ok = await confirmAction(
+          'Horário sobreposto',
+          `Este funcionário já tem ${shortTime(clash.start_time)}–${shortTime(clash.end_time)} apontado neste dia. Salvar mesmo assim?`,
+          'Salvar mesmo assim'
+        );
+        if (!ok) return false;
+      }
+      if (!abs.error && ((abs.data as any[]) ?? []).length > 0) {
+        const ok = await confirmAction(
+          'Funcionário com falta',
+          'Este funcionário está com falta registrada neste dia. Lançar mesmo assim?',
+          'Lançar mesmo assim'
+        );
+        if (!ok) return false;
+      }
+    } catch {
+      // sem internet: segue sem a checagem
+    }
+    return true;
+  }
+
   async function handleSave() {
     if (!validate() || !profile) return;
     setSaving(true);
-
-    const meta = {
-      employee_name: employees.find((e) => e.id === form.employee_id)?.name ?? 'Funcionário',
-      activity_name: selectedActivity?.name ?? 'Atividade',
-      fields: (selectedActivity?.fields ?? [])
-        .filter((f) => (form.field_values[f.id] ?? '') !== '')
-        .map((f) => {
-          const raw = form.field_values[f.id];
-          const value =
-            f.field_type === 'select'
-              ? f.options?.find((o) => o.value === raw)?.label ?? raw
-              : raw;
-          return { field_id: f.id, name: f.name, value, unit: f.unit, field_type: f.field_type };
-        }),
-    };
-
-    async function saveLocally() {
-      await saveOffline(form, profile!.id, meta);
-      notifyQueueChange();
-    }
-
     try {
-      const net = await NetInfo.fetch();
-
-      if (net.isConnected === false) {
-        await saveLocally();
-      } else {
-        try {
-          const { data: ap, error } = await supabase
-            .from('apontamentos')
-            .insert({
-              employee_id: form.employee_id,
-              activity_id: form.activity_id,
-              leader_id: profile.id,
-              work_date: form.work_date,
-              start_time: form.start_time,
-              end_time: form.end_time,
-              notes: form.notes || null,
-            })
-            .select('id')
-            .single();
-          if (error) throw error;
-
-          const fieldEntries = Object.entries(form.field_values)
-            .filter(([, v]) => v !== '')
-            .map(([field_id, value]) => ({ apontamento_id: ap.id, field_id, value }));
-
-          if (fieldEntries.length > 0) {
-            const { error: fvErr } = await supabase
-              .from('apontamento_field_values')
-              .insert(fieldEntries);
-            if (fvErr) throw fvErr;
-          }
-          notifyQueueChange();
-        } catch (e: any) {
-          // sinal ruim (conectado mas sem alcançar o servidor): guarda no aparelho
-          if (isNetworkError(e)) await saveLocally();
-          else throw e;
-        }
-      }
+      if (!(await confirmConflicts())) return;
+      const meta = buildMeta(
+        employees.find((e) => e.id === form.employee_id)?.name ?? 'Funcionário',
+        selectedActivity,
+        form.field_values
+      );
+      await submitApontamento(form, profile.id, meta);
 
       if (addAnother) {
-        setForm((f) => ({
-          ...f,
-          employee_id: '',
-          notes: '',
-          field_values: {},
-        }));
+        setForm((f) => ({ ...f, employee_id: '', notes: '', field_values: {} }));
       } else {
         router.back();
       }
-
-      syncPending().catch(() => {});
     } catch (err: any) {
-      Alert.alert('Erro', err.message ?? 'Não foi possível salvar.');
+      showMessage('Erro', err.message ?? 'Não foi possível salvar.');
     } finally {
       setSaving(false);
     }

@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { View, Text, StyleSheet, ScrollView, Alert, ActivityIndicator } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, ActivityIndicator } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { supabase } from '../../../../lib/supabase';
 import { notifyQueueChange } from '../../../../lib/sync';
@@ -12,6 +12,7 @@ import { Button } from '../../../../components/ui/Button';
 import { TimePicker } from '../../../../components/ui/TimePicker';
 import { DynamicFields } from '../../../../components/apontamento/DynamicFields';
 import { Colors } from '../../../../constants/colors';
+import { showMessage, confirmAction } from '../../../../lib/dialog';
 
 interface ExistingValue {
   id: string;
@@ -51,7 +52,7 @@ export default function EditApontamentoScreen() {
         .eq('id', id)
         .single();
       if (error || !data) {
-        Alert.alert('Erro', error?.message ?? 'Apontamento não encontrado.');
+        showMessage('Erro', error?.message ?? 'Apontamento não encontrado.');
         router.back();
         return;
       }
@@ -121,7 +122,7 @@ export default function EditApontamentoScreen() {
       notifyQueueChange();
       router.back();
     } catch (e: any) {
-      Alert.alert('Erro', e?.message ?? 'Não foi possível salvar.');
+      showMessage('Erro', e?.message ?? 'Não foi possível salvar.');
     } finally {
       setSaving(false);
     }
