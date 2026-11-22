@@ -1,5 +1,5 @@
 import React, { useCallback, useState } from 'react';
-import { View, Text, StyleSheet, FlatList, TouchableOpacity, RefreshControl, Pressable } from 'react-native';
+import { View, Text, StyleSheet, FlatList, TouchableOpacity, RefreshControl, Pressable, Platform } from 'react-native';
 import { useRouter, useFocusEffect } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { useAuth } from '../../../contexts/AuthContext';
@@ -226,7 +226,7 @@ export default function ApontamentosScreen() {
             style={styles.addBtn}
             onPress={() => router.push({ pathname: '/apontamentos/new', params: { work_date: date } })}
           >
-            <Ionicons name="add" size={26} color={Colors.white} />
+            <Ionicons name="add" size={22} color={Colors.white} />
           </TouchableOpacity>
         )}
       </View>
@@ -396,19 +396,20 @@ const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: Colors.background },
   header: {
     flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
-    paddingHorizontal: 16, paddingTop: 56, paddingBottom: 12, backgroundColor: Colors.white,
+    // no navegador (web) não há barra de status para desviar; no app nativo sim
+    paddingHorizontal: 16, paddingTop: Platform.OS === 'web' ? 10 : 44, paddingBottom: 8, backgroundColor: Colors.white,
   },
-  greeting: { fontSize: 20, fontWeight: '700', color: Colors.text },
-  subtitle: { fontSize: 13, color: Colors.textSecondary, marginTop: 2 },
+  greeting: { fontSize: 16, fontWeight: '700', color: Colors.text },
+  subtitle: { fontSize: 12, color: Colors.textSecondary, marginTop: 1 },
   addBtn: {
-    width: 48, height: 48, borderRadius: 24, backgroundColor: Colors.primary,
+    width: 38, height: 38, borderRadius: 19, backgroundColor: Colors.primary,
     alignItems: 'center', justifyContent: 'center',
   },
   dateTabs: {
-    flexDirection: 'row', paddingHorizontal: 12, paddingVertical: 8, backgroundColor: Colors.white,
+    flexDirection: 'row', paddingHorizontal: 12, paddingVertical: 4, backgroundColor: Colors.white,
     gap: 4,
   },
-  dateTab: { paddingHorizontal: 12, paddingVertical: 6, borderRadius: 20 },
+  dateTab: { paddingHorizontal: 12, paddingVertical: 5, borderRadius: 20 },
   dateTabActive: { backgroundColor: Colors.primary },
   dateTabText: { fontSize: 13, color: Colors.gray500, fontWeight: '500' },
   dateTabTextActive: { color: Colors.white, fontWeight: '700' },
@@ -416,7 +417,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row', backgroundColor: Colors.white, paddingHorizontal: 12, paddingBottom: 8,
     borderBottomWidth: 1, borderBottomColor: Colors.border, gap: 6,
   },
-  segBtn: { flex: 1, paddingVertical: 8, borderRadius: 8, backgroundColor: Colors.gray100, alignItems: 'center' },
+  segBtn: { flex: 1, paddingVertical: 6, borderRadius: 8, backgroundColor: Colors.gray100, alignItems: 'center' },
   segBtnOn: { backgroundColor: Colors.primaryLight },
   segText: { fontSize: 13, fontWeight: '600', color: Colors.gray500 },
   segTextOn: { color: Colors.primaryDark },
