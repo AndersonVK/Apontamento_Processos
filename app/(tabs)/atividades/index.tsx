@@ -11,6 +11,7 @@ import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { useActivities } from '../../../hooks/useActivities';
 import { Colors } from '../../../constants/colors';
+import { HEADER_TOP_PADDING } from '../../../constants/layout';
 
 export default function AtividadesScreen() {
   const router = useRouter();
@@ -73,11 +74,11 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'space-between',
     paddingHorizontal: 16,
-    paddingTop: 56,
-    paddingBottom: 12,
+    paddingTop: HEADER_TOP_PADDING,
+    paddingBottom: 8,
     backgroundColor: Colors.white,
   },
-  title: { fontSize: 24, fontWeight: '700', color: Colors.text },
+  title: { fontSize: 18, fontWeight: '700', color: Colors.text },
   addBtn: {
     width: 38,
     height: 38,

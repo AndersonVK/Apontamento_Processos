@@ -11,6 +11,7 @@ import {
 import { Ionicons } from '@expo/vector-icons';
 import { supabase } from '../../../lib/supabase';
 import { Colors } from '../../../constants/colors';
+import { HEADER_TOP_PADDING } from '../../../constants/layout';
 import { Card } from '../../../components/ui/Card';
 import { daysAgoIso } from '../../../lib/date';
 import { showMessage, confirmAction } from '../../../lib/dialog';
@@ -180,11 +181,11 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'space-between',
     paddingHorizontal: 16,
-    paddingTop: 56,
-    paddingBottom: 12,
+    paddingTop: HEADER_TOP_PADDING,
+    paddingBottom: 8,
     backgroundColor: Colors.white,
   },
-  title: { fontSize: 24, fontWeight: '700', color: Colors.text },
+  title: { fontSize: 18, fontWeight: '700', color: Colors.text },
   content: { padding: 16, gap: 12, paddingBottom: 80 },
   periodRow: { flexDirection: 'row', gap: 8 },
   periodBtn: {

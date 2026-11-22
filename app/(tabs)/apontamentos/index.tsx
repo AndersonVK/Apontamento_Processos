@@ -16,6 +16,7 @@ import { confirmAction, showMessage } from '../../../lib/dialog';
 import * as day from '../../../lib/dayService';
 import { removeOp, getOutbox } from '../../../lib/outbox';
 import { Colors } from '../../../constants/colors';
+import { HEADER_TOP_PADDING } from '../../../constants/layout';
 
 const DAYS = 7;
 
@@ -397,7 +398,7 @@ const styles = StyleSheet.create({
   header: {
     flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
     // no navegador (web) não há barra de status para desviar; no app nativo sim
-    paddingHorizontal: 16, paddingTop: Platform.OS === 'web' ? 10 : 44, paddingBottom: 8, backgroundColor: Colors.white,
+    paddingHorizontal: 16, paddingTop: HEADER_TOP_PADDING, paddingBottom: 8, backgroundColor: Colors.white,
   },
   greeting: { fontSize: 16, fontWeight: '700', color: Colors.text },
   subtitle: { fontSize: 12, color: Colors.textSecondary, marginTop: 1 },

@@ -10,6 +10,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import { useAuth } from '../../../contexts/AuthContext';
 import { Colors } from '../../../constants/colors';
+import { HEADER_TOP_PADDING } from '../../../constants/layout';
 import { showMessage, confirmAction } from '../../../lib/dialog';
 
 const ROLE_LABELS: Record<string, string> = {
@@ -140,11 +141,11 @@ const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: Colors.background },
   header: {
     paddingHorizontal: 16,
-    paddingTop: 56,
-    paddingBottom: 12,
+    paddingTop: HEADER_TOP_PADDING,
+    paddingBottom: 8,
     backgroundColor: Colors.white,
   },
-  title: { fontSize: 24, fontWeight: '700', color: Colors.text },
+  title: { fontSize: 18, fontWeight: '700', color: Colors.text },
   content: { padding: 16, gap: 12, paddingBottom: 80 },
   profileCard: {
     flexDirection: 'row',

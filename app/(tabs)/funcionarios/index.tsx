@@ -15,6 +15,7 @@ import { useAuth } from '../../../contexts/AuthContext';
 import { Select } from '../../../components/ui/Select';
 import { Employee } from '../../../types';
 import { Colors } from '../../../constants/colors';
+import { HEADER_TOP_PADDING } from '../../../constants/layout';
 
 const WARN_BG = '#fffbeb';
 const WARN_BORDER = '#f59e0b';
@@ -165,9 +166,9 @@ const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: Colors.background },
   header: {
     flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between',
-    paddingHorizontal: 16, paddingTop: 56, paddingBottom: 12, backgroundColor: Colors.white,
+    paddingHorizontal: 16, paddingTop: HEADER_TOP_PADDING, paddingBottom: 8, backgroundColor: Colors.white,
   },
-  title: { fontSize: 24, fontWeight: '700', color: Colors.text },
+  title: { fontSize: 18, fontWeight: '700', color: Colors.text },
   addBtn: {
     width: 38, height: 38, borderRadius: 19, backgroundColor: Colors.primary,
     alignItems: 'center', justifyContent: 'center',
