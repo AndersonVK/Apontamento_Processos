@@ -10,3 +10,15 @@ export function onQueueChange(cb: Listener): () => void {
 export function notifyQueueChange() {
   listeners.forEach((cb) => cb());
 }
+
+const employeeListeners = new Set<Listener>();
+
+/** Avisa quando funcionários foram criados/editados (o aviso de "sem equipe" recalcula). */
+export function onEmployeesChanged(cb: Listener): () => void {
+  employeeListeners.add(cb);
+  return () => employeeListeners.delete(cb);
+}
+
+export function notifyEmployeesChanged() {
+  employeeListeners.forEach((cb) => cb());
+}

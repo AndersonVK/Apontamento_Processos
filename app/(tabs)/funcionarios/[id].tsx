@@ -17,6 +17,8 @@ import { CheckRow } from '../../../components/ui/Sheet';
 import { ScheduleFields, ScheduleValue, validateSchedule } from '../../../components/apontamento/ScheduleFields';
 import { shortTime } from '../../../lib/date';
 import { Colors } from '../../../constants/colors';
+import { formatCpf, onlyDigits, cpfError } from '../../../lib/cpf';
+import { notifyEmployeesChanged } from '../../../lib/events';
 import { showMessage, confirmAction } from '../../../lib/dialog';
 
 export default function EditFuncionarioScreen() {
@@ -25,6 +27,9 @@ export default function EditFuncionarioScreen() {
   const [employee, setEmployee] = useState<Employee | null>(null);
   const [name, setName] = useState('');
   const [registration, setRegistration] = useState('');
+  const [cpf, setCpf] = useState('');
+  const [hadCpf, setHadCpf] = useState(false);
+  const [errors, setErrors] = useState<Record<string, string>>({});
   const [teamId, setTeamId] = useState('');
   const [custom, setCustom] = useState(false);
   const [wasCustom, setWasCustom] = useState(false);
@@ -43,6 +48,8 @@ export default function EditFuncionarioScreen() {
         setName(emp.name);
         setRegistration(emp.registration ?? '');
         setTeamId(emp.team_id ?? '');
+        setCpf(formatCpf(emp.cpf ?? ''));
+        setHadCpf(!!emp.cpf);
         setCustom(!!emp.custom_schedule);
         setWasCustom(!!emp.custom_schedule);
         setSchedule({
@@ -58,6 +65,9 @@ export default function EditFuncionarioScreen() {
 
   async function handleSave() {
     if (!name.trim()) return;
+    const ce = cpfError(cpf);
+    setErrors({ cpf: ce });
+    if (ce) return;
     const schedErr = custom ? validateSchedule(schedule) : '';
     setScheduleError(schedErr);
     if (schedErr) return;
@@ -66,6 +76,8 @@ export default function EditFuncionarioScreen() {
       name: name.trim(),
       registration: registration.trim() || null,
       team_id: teamId || null,
+      // CPF: só envia se preenchido ou se havia um e foi apagado
+      ...(onlyDigits(cpf) || hadCpf ? { cpf: onlyDigits(cpf) || null } : {}),
       // só mexe na jornada se é personalizada agora ou era antes (para poder desfazer)
       ...(custom || wasCustom
         ? {
@@ -79,9 +91,10 @@ export default function EditFuncionarioScreen() {
     }).eq('id', id);
     setSaving(false);
     if (error) {
-      showMessage('Erro', error.message);
+      showMessage('Erro', error.code === '23505' ? 'Já existe um funcionário com este CPF.' : error.message);
       return;
     }
+    notifyEmployeesChanged();
     router.back();
   }
 
@@ -92,6 +105,7 @@ export default function EditFuncionarioScreen() {
       showMessage('Erro', error.message);
       return;
     }
+    notifyEmployeesChanged();
     router.back();
   }
 
@@ -110,6 +124,15 @@ export default function EditFuncionarioScreen() {
           onChangeText={setRegistration}
           placeholder="Opcional"
           keyboardType="numeric"
+        />
+        <Input
+          label="CPF (opcional)"
+          value={cpf}
+          onChangeText={(v) => { setCpf(formatCpf(v)); setErrors((e) => ({ ...e, cpf: '' })); }}
+          placeholder="000.000.000-00"
+          keyboardType="number-pad"
+          maxLength={14}
+          error={errors.cpf}
         />
         <Select
           label="Equipe"

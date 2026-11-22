@@ -3,7 +3,8 @@ import { Tabs } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { useAuth } from '../../contexts/AuthContext';
 import { Colors } from '../../constants/colors';
-import { Platform } from 'react-native';
+import { Platform, View } from 'react-native';
+import { UnassignedBanner } from '../../components/layout/UnassignedBanner';
 import { useEmployees } from '../../hooks/useEmployees';
 import { useActivities } from '../../hooks/useActivities';
 
@@ -15,6 +16,8 @@ export default function TabsLayout() {
   const isManager = profile?.role === 'director' || profile?.role === 'manager';
 
   return (
+    <View style={{ flex: 1 }}>
+    <UnassignedBanner />
     <Tabs
       screenOptions={{
         tabBarActiveTintColor: Colors.primary,
@@ -86,5 +89,6 @@ export default function TabsLayout() {
         }}
       />
     </Tabs>
+    </View>
   );
 }

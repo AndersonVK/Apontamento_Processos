@@ -28,6 +28,7 @@ export interface Employee {
   active: boolean;
   created_at: string;
   team?: Team;
+  cpf?: string | null;
   custom_schedule?: boolean;
   shift_start?: string | null;
   shift_end?: string | null;

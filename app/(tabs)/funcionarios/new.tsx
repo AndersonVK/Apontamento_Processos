@@ -17,12 +17,15 @@ import { CheckRow } from '../../../components/ui/Sheet';
 import { ScheduleFields, ScheduleValue, validateSchedule } from '../../../components/apontamento/ScheduleFields';
 import { shortTime } from '../../../lib/date';
 import { Colors } from '../../../constants/colors';
+import { formatCpf, onlyDigits, cpfError } from '../../../lib/cpf';
+import { notifyEmployeesChanged } from '../../../lib/events';
 import { showMessage, confirmAction } from '../../../lib/dialog';
 
 export default function NewFuncionarioScreen() {
   const router = useRouter();
   const [name, setName] = useState('');
   const [registration, setRegistration] = useState('');
+  const [cpf, setCpf] = useState('');
   const [teamId, setTeamId] = useState('');
   const [custom, setCustom] = useState(false);
   const [schedule, setSchedule] = useState<ScheduleValue>({ start: '07:00', end: '17:00', breakStart: '12:00', breakEnd: '13:00' });
@@ -40,6 +43,8 @@ export default function NewFuncionarioScreen() {
   async function handleSave() {
     const errs: Record<string, string> = {};
     if (!name.trim()) errs.name = 'Nome obrigatório';
+    const ce = cpfError(cpf);
+    if (ce) errs.cpf = ce;
     if (Object.keys(errs).length) { setErrors(errs); return; }
 
     const schedErr = custom ? validateSchedule(schedule) : '';
@@ -51,6 +56,7 @@ export default function NewFuncionarioScreen() {
       name: name.trim(),
       registration: registration.trim() || null,
       team_id: teamId || null,
+      ...(onlyDigits(cpf) ? { cpf: onlyDigits(cpf) } : {}),
       // só envia a jornada quando é personalizada (não depende das colunas novas no caso comum)
       ...(custom
         ? {
@@ -62,8 +68,12 @@ export default function NewFuncionarioScreen() {
           }
         : {}),
     });
-    if (error) showMessage('Erro', error.message);
-    else router.back();
+    if (error) {
+      showMessage('Erro', error.code === '23505' ? 'Já existe um funcionário com este CPF.' : error.message);
+    } else {
+      notifyEmployeesChanged();
+      router.back();
+    }
     setSaving(false);
   }
 
@@ -89,6 +99,15 @@ export default function NewFuncionarioScreen() {
           onChangeText={setRegistration}
           placeholder="Opcional"
           keyboardType="numeric"
+        />
+        <Input
+          label="CPF (opcional)"
+          value={cpf}
+          onChangeText={(v) => { setCpf(formatCpf(v)); setErrors((e) => ({ ...e, cpf: '' })); }}
+          placeholder="000.000.000-00"
+          keyboardType="number-pad"
+          maxLength={14}
+          error={errors.cpf}
         />
         <Select
           label="Equipe"

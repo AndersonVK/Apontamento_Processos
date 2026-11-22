@@ -4,12 +4,12 @@ import { Employee } from '../types';
 import { useAuth } from '../contexts/AuthContext';
 import { cacheGet, cacheSet } from '../lib/cache';
 
-export function useEmployees(teamOnly = false) {
+export function useEmployees(teamOnly = false, includeInactive = false) {
   const { profile } = useAuth();
   const [employees, setEmployees] = useState<Employee[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const cacheKey = `employees:${teamOnly ? profile?.team_id ?? 'none' : 'all'}`;
+  const cacheKey = `employees:${teamOnly ? profile?.team_id ?? 'none' : 'all'}${includeInactive ? ':inclusive' : ''}`;
 
   const load = useCallback(async () => {
     setError(null);
@@ -25,8 +25,8 @@ export function useEmployees(teamOnly = false) {
       let query = supabase
         .from('employees')
         .select('*, team:teams(id, name)')
-        .eq('active', true)
         .order('name');
+      if (!includeInactive) query = query.eq('active', true);
 
       if (teamOnly && profile?.team_id) {
         query = query.eq('team_id', profile.team_id);
@@ -41,7 +41,7 @@ export function useEmployees(teamOnly = false) {
       if (!cached) setError(e?.message ?? 'Erro ao carregar funcionários');
     }
     setLoading(false);
-  }, [teamOnly, profile?.team_id, cacheKey]);
+  }, [teamOnly, includeInactive, profile?.team_id, cacheKey]);
 
   useEffect(() => {
     load();
