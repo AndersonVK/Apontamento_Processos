@@ -28,6 +28,7 @@ async function syncOne(item: OfflineApontamento): Promise<'ok' | 'network' | 're
         local_id: item.id,
         employee_id: item.employee_id,
         activity_id: item.activity_id,
+        project_id: item.project_id,
         leader_id: item.leader_id,
         work_date: item.work_date,
         start_time: item.start_time,

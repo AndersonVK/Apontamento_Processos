@@ -72,6 +72,7 @@ export default function ApontamentosScreen() {
         start_time: g ? fmtMin(g.start) : row.schedule.start,
         end_time: g ? fmtMin(g.end) : row.schedule.end,
         activity_id: row.lastActivityId ?? '',
+        project_id: row.lastProjectId ?? '',
       },
     });
   }

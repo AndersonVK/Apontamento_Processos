@@ -73,11 +73,20 @@ export interface ApontamentoFieldValue {
   field?: ActivityField;
 }
 
+export interface Project {
+  id: string;
+  name: string;
+  active: boolean;
+  created_at?: string;
+}
+
 export interface Apontamento {
   id: string;
   local_id: string | null;
   employee_id: string;
   activity_id: string;
+  project_id: string;
+  project?: Project;
   leader_id: string;
   work_date: string;
   start_time: string;
@@ -95,6 +104,7 @@ export interface Apontamento {
 export interface ApontamentoFormData {
   employee_id: string;
   activity_id: string;
+  project_id: string;
   work_date: string;
   start_time: string;
   end_time: string;
@@ -106,6 +116,7 @@ export interface ApontamentoFormData {
 export interface OfflineMeta {
   employee_name: string;
   activity_name: string;
+  project_name: string;
   fields: { field_id: string; name: string; value: string; unit: string | null; field_type: FieldType }[];
 }
 

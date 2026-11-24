@@ -9,13 +9,14 @@ import {
 } from 'react-native';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import { supabase } from '../../../lib/supabase';
-import { submitApontamento, buildMeta, lastActivityKey } from '../../../lib/apontamentoService';
+import { submitApontamento, buildMeta, lastActivityKey, lastProjectKey } from '../../../lib/apontamentoService';
 import { cacheGet } from '../../../lib/cache';
 import { toMin } from '../../../lib/coverage';
 import { localDateIso, durationMinutes, shortTime } from '../../../lib/date';
 import { useAuth } from '../../../contexts/AuthContext';
 import { useEmployees } from '../../../hooks/useEmployees';
 import { useActivities } from '../../../hooks/useActivities';
+import { useProjects } from '../../../hooks/useProjects';
 import { Activity, ApontamentoFormData } from '../../../types';
 import { Button } from '../../../components/ui/Button';
 import { Select } from '../../../components/ui/Select';
@@ -37,14 +38,17 @@ export default function NewApontamentoScreen() {
     start_time?: string;
     end_time?: string;
     activity_id?: string;
+    project_id?: string;
   }>();
   const { profile } = useAuth();
   const { employees, loading: loadingEmp } = useEmployees(false);
   const { activities, loading: loadingAct } = useActivities();
+  const { projects, loading: loadingProj } = useProjects();
 
   const [form, setForm] = useState<ApontamentoFormData>({
     employee_id: params.employee_id ?? '',
     activity_id: params.activity_id ?? '',
+    project_id: params.project_id ?? '',
     work_date: params.work_date ?? todayIso(),
     start_time: params.start_time ?? '07:00',
     end_time: params.end_time ?? '17:00',
@@ -62,6 +66,21 @@ export default function NewApontamentoScreen() {
       if (id) setForm((f) => (f.activity_id ? f : { ...f, activity_id: id }));
     });
   }, [profile?.id]);
+
+  // projeto: reaproveita o último usado quando a tela abre sem projeto definido
+  useEffect(() => {
+    if (form.project_id || !profile) return;
+    cacheGet<string>(lastProjectKey(profile.id)).then((id) => {
+      if (id) setForm((f) => (f.project_id ? f : { ...f, project_id: id }));
+    });
+  }, [profile?.id]);
+
+  // só vale o projeto se ainda existe e está ativo (pode ter sido desativado)
+  useEffect(() => {
+    if (!loadingProj && form.project_id && !projects.some((p) => p.id === form.project_id)) {
+      setForm((f) => ({ ...f, project_id: '' }));
+    }
+  }, [loadingProj, projects]);
 
   const selectedActivity = activities.find((a) => a.id === form.activity_id);
 
@@ -81,6 +100,7 @@ export default function NewApontamentoScreen() {
   function validate(): boolean {
     const errs: typeof errors = {};
     if (!form.employee_id) errs.employee_id = 'Selecione um funcionário';
+    if (!form.project_id) errs.project_id = 'Selecione um projeto';
     if (!form.activity_id) errs.activity_id = 'Selecione uma atividade';
     if (!form.start_time) errs.start_time = 'Informe o horário de início';
     if (!form.end_time) errs.end_time = 'Informe o horário de término';
@@ -145,7 +165,8 @@ export default function NewApontamentoScreen() {
       const meta = buildMeta(
         employees.find((e) => e.id === form.employee_id)?.name ?? 'Funcionário',
         selectedActivity,
-        form.field_values
+        form.field_values,
+        projects.find((p) => p.id === form.project_id)?.name ?? 'Projeto'
       );
       await submitApontamento(form, profile.id, meta);
 
@@ -196,6 +217,21 @@ export default function NewApontamentoScreen() {
           error={errors.employee_id}
           required
         />
+
+        <Select
+          label="Projeto"
+          placeholder={projects.length === 0 && !loadingProj ? 'Nenhum projeto cadastrado' : 'Selecionar projeto...'}
+          options={projects.map((p) => ({ label: p.name, value: p.id }))}
+          value={form.project_id}
+          onChange={(v) => setField('project_id', v)}
+          error={errors.project_id}
+          required
+        />
+        {projects.length === 0 && !loadingProj && (
+          <Text style={styles.noProjects}>
+            Cadastre um projeto em Configurações → Projetos (ou peça a um gerente) para poder apontar.
+          </Text>
+        )}
 
         <Select
           label="Atividade"
@@ -281,6 +317,7 @@ export default function NewApontamentoScreen() {
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: Colors.background },
   content: { padding: 16, gap: 16, paddingBottom: 40 },
+  noProjects: { fontSize: 12, color: Colors.danger, marginTop: -8 },
   screenTitle: { fontSize: 22, fontWeight: '700', color: Colors.text, marginBottom: 4 },
   row: { flexDirection: 'row', gap: 12 },
   dynamicSection: {

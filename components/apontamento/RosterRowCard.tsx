@@ -112,6 +112,7 @@ export function RosterRowCard({
                     {r.start}–{r.end} · {r.activityName}
                     {!r.synced ? '  (pendente)' : ''}
                   </Text>
+                  <Text style={styles.recSub}>Projeto: {r.projectName}</Text>
                   {r.summary ? <Text style={styles.recSub}>{r.summary}</Text> : null}
                   {!r.mine && <Text style={styles.recSub}>Apontado por {r.leaderName}</Text>}
                 </View>

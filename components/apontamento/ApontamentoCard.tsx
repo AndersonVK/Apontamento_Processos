@@ -26,7 +26,10 @@ export function ApontamentoCard({ apontamento, onPress }: ApontamentoCardProps) 
             </View>
             <View>
               <Text style={styles.employeeName}>{apontamento.employee?.name}</Text>
-              <Text style={styles.activityName}>{apontamento.activity?.name}</Text>
+              <Text style={styles.activityName}>
+                {apontamento.activity?.name}
+                {apontamento.project?.name ? ` · ${apontamento.project.name}` : ''}
+              </Text>
             </View>
           </View>
           {!apontamento.synced && (

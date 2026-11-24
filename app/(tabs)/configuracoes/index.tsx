@@ -61,6 +61,13 @@ export default function ConfiguracoesScreen() {
               <Text style={[styles.moduleName, { flex: 1 }]}>Equipes</Text>
               <Ionicons name="chevron-forward" size={16} color={Colors.gray300} />
             </TouchableOpacity>
+            <TouchableOpacity style={styles.moduleItem} onPress={() => router.push('/configuracoes/projetos')}>
+              <View style={styles.moduleIcon}>
+                <Ionicons name="folder-open-outline" size={20} color={Colors.primary} />
+              </View>
+              <Text style={[styles.moduleName, { flex: 1 }]}>Projetos</Text>
+              <Ionicons name="chevron-forward" size={16} color={Colors.gray300} />
+            </TouchableOpacity>
             <TouchableOpacity style={styles.moduleItem} onPress={() => router.push('/configuracoes/usuarios')}>
               <View style={styles.moduleIcon}>
                 <Ionicons name="key-outline" size={20} color={Colors.primary} />

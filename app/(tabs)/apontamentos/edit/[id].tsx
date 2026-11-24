@@ -5,6 +5,7 @@ import { supabase } from '../../../../lib/supabase';
 import { notifyQueueChange } from '../../../../lib/sync';
 import { durationMinutes, formatDateBr, shortTime } from '../../../../lib/date';
 import { useEmployees } from '../../../../hooks/useEmployees';
+import { useProjects } from '../../../../hooks/useProjects';
 import { Activity, ActivityField } from '../../../../types';
 import { Select } from '../../../../components/ui/Select';
 import { Input } from '../../../../components/ui/Input';
@@ -24,12 +25,14 @@ export default function EditApontamentoScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const router = useRouter();
   const { employees } = useEmployees(false);
+  const { projects } = useProjects(true);
 
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [activity, setActivity] = useState<Activity | null>(null);
   const [workDate, setWorkDate] = useState('');
   const [employeeId, setEmployeeId] = useState('');
+  const [projectId, setProjectId] = useState('');
   const [start, setStart] = useState('');
   const [end, setEnd] = useState('');
   const [notes, setNotes] = useState('');
@@ -67,6 +70,7 @@ export default function EditApontamentoScreen() {
       setActivity(act);
       setWorkDate(data.work_date);
       setEmployeeId(data.employee_id);
+      setProjectId(data.project_id ?? '');
       setStart(shortTime(data.start_time));
       setEnd(shortTime(data.end_time));
       setNotes(data.notes ?? '');
@@ -80,6 +84,7 @@ export default function EditApontamentoScreen() {
   function validate() {
     const errs: Record<string, string> = {};
     if (!employeeId) errs.employee = 'Selecione um funcionário';
+    if (!projectId) errs.project = 'Selecione um projeto';
     if (!start) errs.start = 'Informe o horário de início';
     if (!end) errs.end = 'Informe o horário de término';
     if (start && end && durationMinutes(start, end) === null) errs.end = 'O término deve ser depois do início';
@@ -96,7 +101,7 @@ export default function EditApontamentoScreen() {
     try {
       const { data: updated, error } = await supabase
         .from('apontamentos')
-        .update({ employee_id: employeeId, start_time: start, end_time: end, notes: notes.trim() || null })
+        .update({ employee_id: employeeId, project_id: projectId, start_time: start, end_time: end, notes: notes.trim() || null })
         .eq('id', id)
         .select('id');
       if (error) throw error;
@@ -152,6 +157,15 @@ export default function EditApontamentoScreen() {
         value={employeeId}
         onChange={(v) => { setEmployeeId(v); setErrors((e) => ({ ...e, employee: '' })); }}
         error={errors.employee}
+        required
+      />
+
+      <Select
+        label="Projeto"
+        options={projects.map((p) => ({ label: p.active ? p.name : `${p.name} (inativo)`, value: p.id }))}
+        value={projectId}
+        onChange={(v) => { setProjectId(v); setErrors((e) => ({ ...e, project: '' })); }}
+        error={errors.project}
         required
       />
 

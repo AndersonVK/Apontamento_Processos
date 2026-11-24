@@ -33,6 +33,7 @@ export default function ApontamentoDetailScreen() {
         *,
         employee:employees(id, name),
         activity:activities(id, name),
+        project:projects(id, name),
         leader:profiles!leader_id(id, name),
         field_values:apontamento_field_values(
           *,
@@ -91,6 +92,7 @@ export default function ApontamentoDetailScreen() {
           <View>
             <Text style={styles.name}>{apontamento.employee?.name}</Text>
             <Text style={styles.activity}>{apontamento.activity?.name}</Text>
+            <Text style={styles.activity}>Projeto: {apontamento.project?.name ?? '—'}</Text>
           </View>
         </View>
 

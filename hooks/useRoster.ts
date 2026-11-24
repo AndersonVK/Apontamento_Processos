@@ -23,6 +23,8 @@ export interface RosterRecord {
   end: string;
   activityId: string;
   activityName: string;
+  projectId: string;
+  projectName: string;
   leaderId: string;
   leaderName: string;
   mine: boolean;
@@ -40,6 +42,7 @@ export interface RosterRow {
   analysis: Analysis;
   status: DayStatus;
   lastActivityId: string | null;
+  lastProjectId: string | null;
 }
 
 export interface RosterSummary {
@@ -96,9 +99,10 @@ async function fetchBundle(
   const apRes = await supabase
     .from('apontamentos')
     .select(
-      `id, local_id, employee_id, activity_id, leader_id, work_date, start_time, end_time,
+      `id, local_id, employee_id, activity_id, project_id, leader_id, work_date, start_time, end_time,
        employee:employees(*, team:teams(*)),
        activity:activities(id, name),
+       project:projects(id, name),
        leader:profiles!leader_id(id, name),
        field_values:apontamento_field_values(value, field:activity_fields(name, unit, field_type))`
     )
@@ -210,6 +214,8 @@ export function useRoster(teamId: string | null, date: string) {
           end: shortTime(a.end_time),
           activityId: a.activity_id,
           activityName: a.activity?.name ?? 'Atividade',
+          projectId: a.project_id,
+          projectName: a.project?.name ?? 'Projeto',
           leaderId: a.leader_id,
           leaderName: a.leader?.name ?? 'outro líder',
           mine: a.leader_id === profile.id,
@@ -226,6 +232,8 @@ export function useRoster(teamId: string | null, date: string) {
             end: shortTime(p.end_time),
             activityId: p.activity_id,
             activityName: p.meta?.activity_name ?? 'Atividade',
+            projectId: p.project_id,
+            projectName: p.meta?.project_name ?? 'Projeto',
             leaderId: p.leader_id,
             leaderName: profile.name,
             mine: true,
@@ -283,6 +291,7 @@ export function useRoster(teamId: string | null, date: string) {
           analysis,
           status,
           lastActivityId: mine.length ? mine[mine.length - 1].activityId : null,
+          lastProjectId: mine.length ? mine[mine.length - 1].projectId : null,
         };
       });
 

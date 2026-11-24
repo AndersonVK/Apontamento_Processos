@@ -14,6 +14,8 @@ export default function ConfiguracoesLayout() {
       <Stack.Screen name="index" options={{ headerShown: false }} />
       <Stack.Screen name="equipes/index" options={{ title: 'Equipes' }} />
       <Stack.Screen name="equipes/[id]" options={{ title: 'Equipe' }} />
+      <Stack.Screen name="projetos/index" options={{ title: 'Projetos' }} />
+      <Stack.Screen name="projetos/[id]" options={{ title: 'Projeto' }} />
       <Stack.Screen name="usuarios/index" options={{ title: 'Usuários' }} />
       <Stack.Screen name="usuarios/[id]" options={{ title: 'Usuário' }} />
     </Stack>

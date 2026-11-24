@@ -18,6 +18,7 @@ async function initSchema(db: SQLite.SQLiteDatabase) {
       id TEXT PRIMARY KEY,
       employee_id TEXT NOT NULL,
       activity_id TEXT NOT NULL,
+      project_id TEXT NOT NULL DEFAULT '',
       leader_id TEXT NOT NULL,
       work_date TEXT NOT NULL,
       start_time TEXT NOT NULL,
@@ -34,12 +35,16 @@ async function initSchema(db: SQLite.SQLiteDatabase) {
   try {
     await db.execAsync(`ALTER TABLE offline_apontamentos ADD COLUMN meta TEXT NOT NULL DEFAULT '{}'`);
   } catch {}
+  try {
+    await db.execAsync(`ALTER TABLE offline_apontamentos ADD COLUMN project_id TEXT NOT NULL DEFAULT ''`);
+  } catch {}
 }
 
 export interface OfflineApontamento {
   id: string;
   employee_id: string;
   activity_id: string;
+  project_id: string;
   leader_id: string;
   work_date: string;
   start_time: string;
@@ -63,12 +68,13 @@ export async function saveOffline(
 
   await db.runAsync(
     `INSERT INTO offline_apontamentos
-      (id, employee_id, activity_id, leader_id, work_date, start_time, end_time, notes, field_values, synced, created_at, meta)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 0, ?, ?)`,
+      (id, employee_id, activity_id, project_id, leader_id, work_date, start_time, end_time, notes, field_values, synced, created_at, meta)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 0, ?, ?)`,
     [
       id,
       data.employee_id,
       data.activity_id,
+      data.project_id,
       leaderId,
       data.work_date,
       data.start_time,

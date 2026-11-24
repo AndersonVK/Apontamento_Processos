@@ -9,11 +9,13 @@ import { Activity, ApontamentoFormData, OfflineMeta } from '../types';
 export function buildMeta(
   employeeName: string,
   activity: Activity | undefined,
-  fieldValues: Record<string, string>
+  fieldValues: Record<string, string>,
+  projectName: string
 ): OfflineMeta {
   return {
     employee_name: employeeName,
     activity_name: activity?.name ?? 'Atividade',
+    project_name: projectName,
     fields: (activity?.fields ?? [])
       .filter((f) => (fieldValues[f.id] ?? '') !== '')
       .map((f) => {
@@ -27,6 +29,10 @@ export function buildMeta(
 
 export function lastActivityKey(profileId: string) {
   return `last_activity:${profileId}`;
+}
+
+export function lastProjectKey(profileId: string) {
+  return `last_project:${profileId}`;
 }
 
 /**
@@ -46,6 +52,7 @@ export async function submitApontamento(
   }
 
   cacheSet(lastActivityKey(leaderId), form.activity_id);
+  cacheSet(lastProjectKey(leaderId), form.project_id);
 
   const net = await NetInfo.fetch();
   if (net.isConnected === false) return saveLocally();
@@ -56,6 +63,7 @@ export async function submitApontamento(
       .insert({
         employee_id: form.employee_id,
         activity_id: form.activity_id,
+        project_id: form.project_id,
         leader_id: leaderId,
         work_date: form.work_date,
         start_time: form.start_time,

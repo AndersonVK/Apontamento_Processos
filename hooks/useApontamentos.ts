@@ -12,6 +12,8 @@ function pendingToApontamento(p: OfflineApontamento): Apontamento {
     local_id: p.id,
     employee_id: p.employee_id,
     activity_id: p.activity_id,
+    project_id: p.project_id,
+    project: { id: p.project_id, name: p.meta?.project_name ?? 'Projeto' } as any,
     leader_id: p.leader_id,
     work_date: p.work_date,
     start_time: p.start_time,
@@ -59,6 +61,7 @@ export function useApontamentos(date?: string) {
           *,
           employee:employees(id, name),
           activity:activities(id, name),
+          project:projects(id, name),
           leader:profiles!leader_id(id, name),
           field_values:apontamento_field_values(
             *,

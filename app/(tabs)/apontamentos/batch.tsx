@@ -1,10 +1,12 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { View, Text, StyleSheet, ScrollView, KeyboardAvoidingView, Platform } from 'react-native';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import { useAuth } from '../../../contexts/AuthContext';
 import { useEmployees } from '../../../hooks/useEmployees';
 import { useActivities } from '../../../hooks/useActivities';
-import { submitApontamento, buildMeta } from '../../../lib/apontamentoService';
+import { useProjects } from '../../../hooks/useProjects';
+import { cacheGet } from '../../../lib/cache';
+import { submitApontamento, buildMeta, lastProjectKey } from '../../../lib/apontamentoService';
 import { durationMinutes } from '../../../lib/date';
 import { showMessage } from '../../../lib/dialog';
 import { Select } from '../../../components/ui/Select';
@@ -25,14 +27,25 @@ export default function BatchApontamentoScreen() {
   const { profile } = useAuth();
   const { employees } = useEmployees(false);
   const { activities } = useActivities();
+  const { projects, loading: loadingProj } = useProjects();
 
   const [remaining, setRemaining] = useState<string[]>((params.employees ?? '').split(',').filter(Boolean));
+  const [projectId, setProjectId] = useState('');
   const [activityId, setActivityId] = useState('');
   const [start, setStart] = useState(params.start_time ?? '07:00');
   const [end, setEnd] = useState(params.end_time ?? '17:00');
   const [values, setValues] = useState<Record<string, Record<string, string>>>({});
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [saving, setSaving] = useState(false);
+
+  // sugere o último projeto usado
+  useEffect(() => {
+    if (!profile) return;
+    cacheGet<string>(lastProjectKey(profile.id)).then((id) => id && setProjectId((cur) => cur || id));
+  }, [profile?.id]);
+  useEffect(() => {
+    if (!loadingProj && projectId && !projects.some((p) => p.id === projectId)) setProjectId('');
+  }, [loadingProj, projects]);
 
   const activity = activities.find((a) => a.id === activityId);
   const fields = activity?.fields ?? [];
@@ -50,6 +63,7 @@ export default function BatchApontamentoScreen() {
 
   function validate(): boolean {
     const errs: Record<string, string> = {};
+    if (!projectId) errs.project = 'Selecione um projeto';
     if (!activityId) errs.activity = 'Selecione uma atividade';
     if (!start || !end || durationMinutes(start, end) === null) errs.time = 'O término deve ser depois do início';
     for (const id of remaining) {
@@ -72,6 +86,7 @@ export default function BatchApontamentoScreen() {
           {
             employee_id: id,
             activity_id: activityId,
+            project_id: projectId,
             work_date: params.work_date,
             start_time: start,
             end_time: end,
@@ -79,7 +94,7 @@ export default function BatchApontamentoScreen() {
             field_values: fv,
           },
           profile.id,
-          buildMeta(nameOf(id), activity, fv)
+          buildMeta(nameOf(id), activity, fv, projects.find((p) => p.id === projectId)?.name ?? 'Projeto')
         );
       } catch (e: any) {
         failed.push({ id, message: e?.message ?? 'erro' });
@@ -102,6 +117,16 @@ export default function BatchApontamentoScreen() {
       <ScrollView style={styles.container} contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
         <Text style={styles.title}>Lançar para {remaining.length} funcionário(s)</Text>
         <Text style={styles.hint}>A atividade e o horário valem para todos. Ajuste os dados de cada um abaixo.</Text>
+
+        <Select
+          label="Projeto"
+          placeholder={projects.length === 0 && !loadingProj ? 'Nenhum projeto cadastrado' : 'Selecionar projeto...'}
+          options={projects.map((p) => ({ label: p.name, value: p.id }))}
+          value={projectId}
+          onChange={(v) => { setProjectId(v); setErrors((e) => ({ ...e, project: '' })); }}
+          error={errors.project}
+          required
+        />
 
         <Select
           label="Atividade"

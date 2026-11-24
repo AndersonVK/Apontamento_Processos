@@ -10,6 +10,7 @@ export interface OfflineApontamento {
   id: string;
   employee_id: string;
   activity_id: string;
+  project_id: string;
   leader_id: string;
   work_date: string;
   start_time: string;
@@ -42,6 +43,7 @@ export async function saveOffline(
     id,
     employee_id: data.employee_id,
     activity_id: data.activity_id,
+    project_id: data.project_id,
     leader_id: leaderId,
     work_date: data.work_date,
     start_time: data.start_time,
