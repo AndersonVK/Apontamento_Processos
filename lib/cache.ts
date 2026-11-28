@@ -23,7 +23,7 @@ export async function pruneOldRosterCache(keepDays = 30): Promise<void> {
     const limit = `${cutoff.getFullYear()}-${String(cutoff.getMonth() + 1).padStart(2, '0')}-${String(cutoff.getDate()).padStart(2, '0')}`;
     const keys = await AsyncStorage.getAllKeys();
     const stale = keys.filter((k) => {
-      const m = /^cache:roster:.+:(\d{4}-\d{2}-\d{2})$/.exec(k);
+      const m = /^cache:roster2?:.+:(\d{4}-\d{2}-\d{2})$/.exec(k);
       return !!m && m[1] < limit;
     });
     if (stale.length) await AsyncStorage.multiRemove(stale);

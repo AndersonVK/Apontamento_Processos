@@ -13,12 +13,19 @@ interface Props {
   teamId: string | null;
   onSelect: (iso: string) => void;
   onClose: () => void;
+  /** primeiro dia permitido (dias antes ficam apagados) */
+  minDate?: string;
+  /** mostrar os marcadores de dia fechado/aberto (precisa de teamId) */
+  showMarks?: boolean;
+  title?: string;
 }
 
 const WEEK = ['D', 'S', 'T', 'Q', 'Q', 'S', 'S'];
 
 /** Calendário do mês. Marcadores: ✓ fechado · ● aberto (tem lançamentos) · – sem trabalho. */
-export function CalendarSheet({ visible, selected, teamId, onSelect, onClose }: Props) {
+export function CalendarSheet({
+  visible, selected, teamId, onSelect, onClose, minDate, showMarks = true, title = 'Escolher data',
+}: Props) {
   const today = localDateIso();
   const [view, setView] = useState(() => {
     const d = parseLocalDate(selected);
@@ -32,9 +39,12 @@ export function CalendarSheet({ visible, selected, teamId, onSelect, onClose }: 
     }
   }, [visible, selected]);
 
-  const { marks } = useMonthOverview(teamId, view.y, view.m, visible);
+  const { marks } = useMonthOverview(teamId, view.y, view.m, visible && showMarks);
   const now = parseLocalDate(today);
   const atCurrentMonth = view.y === now.getFullYear() && view.m === now.getMonth();
+
+  const minMonth = minDate ? parseLocalDate(minDate) : null;
+  const atMinMonth = !!minMonth && view.y === minMonth.getFullYear() && view.m === minMonth.getMonth();
 
   function step(delta: number) {
     setView((v) => {
@@ -46,9 +56,14 @@ export function CalendarSheet({ visible, selected, teamId, onSelect, onClose }: 
   const weeks = monthMatrix(view.y, view.m);
 
   return (
-    <Sheet visible={visible} title="Escolher data" onClose={onClose}>
+    <Sheet visible={visible} title={title} onClose={onClose}>
       <View style={styles.nav}>
-        <Pressable style={styles.navBtn} onPress={() => step(-1)} accessibilityLabel="Mês anterior">
+        <Pressable
+          style={[styles.navBtn, atMinMonth && { opacity: 0.3 }]}
+          disabled={atMinMonth}
+          onPress={() => step(-1)}
+          accessibilityLabel="Mês anterior"
+        >
           <Ionicons name="chevron-back" size={20} color={Colors.gray700} />
         </Pressable>
         <Text style={styles.month}>
@@ -74,7 +89,7 @@ export function CalendarSheet({ visible, selected, teamId, onSelect, onClose }: 
         <View key={wi} style={styles.weekRow}>
           {week.map((iso, di) => {
             if (!iso) return <View key={di} style={styles.cell} />;
-            const future = iso > today;
+            const future = iso > today || (!!minDate && iso < minDate);
             const isSel = iso === selected;
             const mark = marks[iso];
             return (
@@ -101,11 +116,13 @@ export function CalendarSheet({ visible, selected, teamId, onSelect, onClose }: 
         </View>
       ))}
 
+      {showMarks && (
       <View style={styles.legend}>
         <Text style={styles.legendText}><Text style={{ color: Colors.primary, fontWeight: '700' }}>✓</Text> fechado</Text>
         <Text style={styles.legendText}><Text style={{ color: '#f59e0b', fontWeight: '700' }}>●</Text> aberto (tem lançamentos)</Text>
         <Text style={styles.legendText}><Text style={{ fontWeight: '700' }}>–</Text> sem trabalho</Text>
       </View>
+      )}
     </Sheet>
   );
 }

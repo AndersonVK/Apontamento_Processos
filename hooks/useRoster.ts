@@ -13,7 +13,7 @@ import {
   Schedule,
   analyze,
   dayStatus,
-  resolveSchedule,
+  DEFAULT_SCHEDULE,
 } from '../lib/coverage';
 import { Absence, Employee, IdleBlock, Team, TeamDay } from '../types';
 
@@ -55,13 +55,41 @@ export interface RosterSummary {
   overlaps: number;
 }
 
+/** Funcionário NAQUELE dia: equipe e jornada vindas do histórico (resolvidas pelo banco). */
+interface DayEmployee {
+  id: string;
+  name: string;
+  registration: string | null;
+  active: boolean;
+  is_member: boolean; // estava na equipe exibida neste dia
+  team_id: string | null; // equipe dele naquele dia
+  team_name: string | null;
+  schedule: {
+    shift_start: string;
+    shift_end: string;
+    break_start: string | null;
+    break_end: string | null;
+  } | null;
+}
+
 interface Bundle {
   team: Team | null;
-  employees: Employee[];
+  employees: DayEmployee[];
   apontamentos: any[];
   absences: Absence[];
   idle: IdleBlock[];
   teamDay: TeamDay | null;
+}
+
+function scheduleOf(emp: DayEmployee | undefined): Schedule {
+  const s = emp?.schedule;
+  if (!s?.shift_start || !s?.shift_end) return DEFAULT_SCHEDULE;
+  return {
+    start: shortTime(s.shift_start),
+    end: shortTime(s.shift_end),
+    breakStart: s.break_start ? shortTime(s.break_start) : null,
+    breakEnd: s.break_end ? shortTime(s.break_end) : null,
+  };
 }
 
 const EMPTY_SUMMARY: RosterSummary = {
@@ -73,77 +101,31 @@ function isMissingTable(err: any): boolean {
   return /42P01|PGRST205|does not exist|schema cache|Could not find the table/i.test(text);
 }
 
+/** Uma única ida ao servidor: quem estava na equipe no dia, jornadas, registros, faltas e estado do dia. */
 async function fetchBundle(
   teamId: string,
-  date: string,
-  profileId: string
+  date: string
 ): Promise<{ bundle: Bundle; needsMigration: boolean }> {
-  const [teamRes, empRes] = await Promise.all([
-    supabase.from('teams').select('*').eq('id', teamId).maybeSingle(),
-    supabase
-      .from('employees')
-      .select('*, team:teams(*)')
-      .eq('team_id', teamId)
-      .eq('active', true)
-      .order('name'),
-  ]);
-  if (teamRes.error) throw teamRes.error;
-  if (empRes.error) throw empRes.error;
-  const employees = (empRes.data as Employee[]) ?? [];
-  const ids = employees.map((e) => e.id);
-
-  // registros dos funcionários da equipe (de qualquer líder) + os que EU lancei (emprestados)
-  const orFilter = ids.length
-    ? `employee_id.in.(${ids.join(',')}),leader_id.eq.${profileId}`
-    : `leader_id.eq.${profileId}`;
-  const apRes = await supabase
-    .from('apontamentos')
-    .select(
-      `id, local_id, employee_id, activity_id, project_id, leader_id, work_date, start_time, end_time,
-       employee:employees(*, team:teams(*)),
-       activity:activities(id, name),
-       project:projects(id, name),
-       leader:profiles!leader_id(id, name),
-       field_values:apontamento_field_values(value, field:activity_fields(name, unit, field_type))`
-    )
-    .eq('work_date', date)
-    .or(orFilter);
-  if (apRes.error) throw apRes.error;
-  const apontamentos = (apRes.data as any[]) ?? [];
-
-  const allIds = Array.from(new Set([...ids, ...apontamentos.map((a) => a.employee_id)]));
-
-  let needsMigration = false;
-  const guard = <T,>(res: { data: T | null; error: any }, fallback: T): T => {
-    if (res.error) {
-      if (isMissingTable(res.error)) {
-        needsMigration = true;
-        return fallback;
-      }
-      throw res.error;
+  const { data, error } = await supabase.rpc('team_roster', { p_team: teamId, p_date: date });
+  if (error) {
+    if (/PGRST202|42883|Could not find the function|does not exist/i.test(`${error.code} ${error.message}`)) {
+      return {
+        needsMigration: true,
+        bundle: { team: null, employees: [], apontamentos: [], absences: [], idle: [], teamDay: null },
+      };
     }
-    return (res.data as T) ?? fallback;
-  };
-
-  const [absRes, idleRes, dayRes] = await Promise.all([
-    allIds.length
-      ? supabase.from('absences').select('*').eq('work_date', date).in('employee_id', allIds)
-      : Promise.resolve({ data: [] as Absence[], error: null }),
-    allIds.length
-      ? supabase.from('idle_blocks').select('*').eq('work_date', date).in('employee_id', allIds)
-      : Promise.resolve({ data: [] as IdleBlock[], error: null }),
-    supabase.from('team_days').select('*').eq('team_id', teamId).eq('work_date', date).maybeSingle(),
-  ]);
-
+    throw error;
+  }
+  const r = (data ?? {}) as any;
   return {
-    needsMigration,
+    needsMigration: false,
     bundle: {
-      team: (teamRes.data as Team) ?? null,
-      employees,
-      apontamentos,
-      absences: guard(absRes as any, [] as Absence[]),
-      idle: guard(idleRes as any, [] as IdleBlock[]),
-      teamDay: guard(dayRes as any, null as TeamDay | null),
+      team: r.team ?? null,
+      employees: r.employees ?? [],
+      apontamentos: r.apontamentos ?? [],
+      absences: r.absences ?? [],
+      idle: r.idle ?? [],
+      teamDay: r.team_day ?? null,
     },
   };
 }
@@ -186,17 +168,22 @@ export function useRoster(teamId: string | null, date: string) {
       );
       const day = (dayRows[0] as TeamDay | undefined) ?? null;
 
-      // funcionários conhecidos: da equipe + emprestados que apareceram nos registros
-      const empMap = new Map<string, Employee>();
+      // funcionários do dia (membros + emprestados) e, offline, os que só existem na fila local
+      const empMap = new Map<string, DayEmployee>();
       bundle.employees.forEach((e) => empMap.set(e.id, e));
-      bundle.apontamentos.forEach((a) => a.employee && !empMap.has(a.employee_id) && empMap.set(a.employee_id, a.employee));
       pending.forEach((p) => {
         if (!empMap.has(p.employee_id)) {
           const known = cachedAll.find((e) => e.id === p.employee_id);
-          empMap.set(
-            p.employee_id,
-            known ?? ({ id: p.employee_id, name: p.meta?.employee_name ?? 'Funcionário', team_id: null } as Employee)
-          );
+          empMap.set(p.employee_id, {
+            id: p.employee_id,
+            name: known?.name ?? p.meta?.employee_name ?? 'Funcionário',
+            registration: known?.registration ?? null,
+            active: true,
+            is_member: false,
+            team_id: known?.team_id ?? null,
+            team_name: known?.team?.name ?? null,
+            schedule: null,
+          });
         }
       });
 
@@ -244,14 +231,24 @@ export function useRoster(teamId: string | null, date: string) {
           })
         );
 
-      const teamMemberIds = new Set(bundle.employees.map((e) => e.id));
+      const teamMemberIds = new Set(bundle.employees.filter((e) => e.is_member).map((e) => e.id));
       const order = [
-        ...bundle.employees.map((e) => e.id),
+        ...bundle.employees.filter((e) => e.is_member).map((e) => e.id),
         ...Array.from(recordsByEmp.keys()).filter((id) => !teamMemberIds.has(id)),
       ];
 
       const built: RosterRow[] = order.map((empId) => {
-        const emp = empMap.get(empId)!;
+        // tolerante: um registro pode citar alguém que não veio na lista do dia
+        const emp: DayEmployee = empMap.get(empId) ?? {
+          id: empId,
+          name: 'Funcionário',
+          registration: null,
+          active: true,
+          is_member: false,
+          team_id: null,
+          team_name: null,
+          schedule: null,
+        };
         const isMember = teamMemberIds.has(empId);
         const records = (recordsByEmp.get(empId) ?? []).sort((a, b) => a.start.localeCompare(b.start));
         const idle = idleAll
@@ -259,11 +256,7 @@ export function useRoster(teamId: string | null, date: string) {
           .map((b) => ({ ...b, start_time: shortTime(b.start_time), end_time: shortTime(b.end_time) }))
           .sort((a, b) => a.start_time.localeCompare(b.start_time));
         const absence = absences.find((a) => a.employee_id === empId) ?? null;
-        const schedule = resolveSchedule(
-          isMember ? bundle.team : emp.team,
-          emp,
-          isMember ? day : null
-        );
+        const schedule = scheduleOf(emp);
         const blocks = [
           ...records.map((r) => ({ start: r.start, end: r.end, kind: 'work' as const })),
           ...idle.map((b) => ({ start: b.start_time, end: b.end_time, kind: 'idle' as const })),
@@ -281,7 +274,7 @@ export function useRoster(teamId: string | null, date: string) {
             id: emp.id,
             name: emp.name,
             teamId: emp.team_id ?? null,
-            teamName: emp.team?.name ?? null,
+            teamName: emp.team_name ?? null,
           },
           borrowed: !isMember,
           schedule,
@@ -321,7 +314,7 @@ export function useRoster(teamId: string | null, date: string) {
       setLoading(false);
       return;
     }
-    const cacheKey = `roster:${teamId}:${date}`;
+    const cacheKey = `roster2:${teamId}:${date}`;
     setError('');
 
     // 1) mostra já o que está guardado no aparelho (não espera a rede)
@@ -349,7 +342,16 @@ export function useRoster(teamId: string | null, date: string) {
         const members = (all ?? []).filter((x) => x.team_id === teamId);
         await compute({
           team: members[0]?.team ?? null,
-          employees: members,
+          employees: members.map((m) => ({
+            id: m.id,
+            name: m.name,
+            registration: m.registration ?? null,
+            active: m.active,
+            is_member: true,
+            team_id: m.team_id,
+            team_name: m.team?.name ?? null,
+            schedule: null,
+          })),
           apontamentos: [],
           absences: [],
           idle: [],
@@ -362,7 +364,7 @@ export function useRoster(teamId: string | null, date: string) {
 
     // 3) busca no servidor e atualiza
     try {
-      const { bundle, needsMigration: nm } = await fetchBundle(teamId, date, profile.id);
+      const { bundle, needsMigration: nm } = await fetchBundle(teamId, date);
       setNeedsMigration(nm);
       setOffline(false);
       baseRef.current = { key: cacheKey, bundle };

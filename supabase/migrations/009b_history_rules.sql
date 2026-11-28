@@ -1,4 +1,7 @@
 -- Histórico por data (parte B): regras (funções e gatilhos) e preenchimento do que já existe.
+-- NOTA: no projeto atual esta parte foi aplicada em pedaços; os três UPDATE finais (carimbar
+-- lançamentos antigos) foram omitidos porque não havia nenhum lançamento. Em um banco que já
+-- tenha lançamentos, rode-os ao final.
 
 -- Equipe do funcionário numa data
 CREATE OR REPLACE FUNCTION employee_team_on(p_employee uuid, p_date date) RETURNS uuid
@@ -182,7 +185,12 @@ DECLARE v_eff date := p_eff; v_first boolean; v_lc date; v_team uuid;
 BEGIN
   SELECT NOT EXISTS (SELECT 1 FROM employee_schedule_versions WHERE employee_id = p_employee) INTO v_first;
   IF v_first AND NOT p_custom THEN RETURN; END IF;   -- nada a desfazer
-  IF v_first THEN v_eff := NULL; ELSIF v_eff IS NULL THEN v_eff := current_date; END IF;
+  -- sem data informada: a primeira versão vale desde sempre (cadastro novo); com data, vale a data
+  IF v_first AND p_eff IS NULL THEN
+    v_eff := NULL;
+  ELSIF v_eff IS NULL THEN
+    v_eff := current_date;
+  END IF;
   IF v_eff IS NOT NULL AND v_eff > current_date THEN
     RAISE EXCEPTION 'A data da mudança não pode ser futura.' USING ERRCODE = 'P0001';
   END IF;

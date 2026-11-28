@@ -7,7 +7,9 @@ import { Input } from '../../../../components/ui/Input';
 import { Select } from '../../../../components/ui/Select';
 import { Button } from '../../../../components/ui/Button';
 import { ScheduleFields, ScheduleValue, validateSchedule } from '../../../../components/apontamento/ScheduleFields';
-import { shortTime } from '../../../../lib/date';
+import { shortTime, localDateIso } from '../../../../lib/date';
+import { EffectiveDateField } from '../../../../components/apontamento/EffectiveDateField';
+import { useChangeMinDate } from '../../../../hooks/useChangeMinDate';
 import { Colors } from '../../../../constants/colors';
 import { showMessage, confirmAction } from '../../../../lib/dialog';
 
@@ -23,7 +25,8 @@ export default function EquipeFormScreen() {
   const [nameError, setNameError] = useState('');
   const [schedule, setSchedule] = useState<ScheduleValue>({ start: '07:00', end: '17:00', breakStart: '12:00', breakEnd: '13:00' });
   const [scheduleError, setScheduleError] = useState('');
-  const [sendSchedule, setSendSchedule] = useState(false);
+  const [origSchedule, setOrigSchedule] = useState<ScheduleValue | null>(null);
+  const [effDate, setEffDate] = useState(localDateIso());
 
   useEffect(() => {
     (async () => {
@@ -39,17 +42,26 @@ export default function EquipeFormScreen() {
           setName(t.name);
           setLeaderId(t.leader_id ?? '');
           setPreviousLeaderId(t.leader_id ?? '');
-          setSendSchedule(t.shift_start !== undefined);
-          setSchedule({
+          const sched: ScheduleValue = {
             start: shortTime(t.shift_start ?? '07:00'),
             end: shortTime(t.shift_end ?? '17:00'),
             breakStart: shortTime(t.break_start ?? ''),
             breakEnd: shortTime(t.break_end ?? ''),
-          });
+          };
+          setSchedule(sched);
+          setOrigSchedule(sched);
         }
       }
     })();
   }, [id, isNew]);
+
+  const scheduleChanged = !isNew && !!origSchedule && JSON.stringify(schedule) !== JSON.stringify(origSchedule);
+  const minDate = useChangeMinDate(isNew ? [] : [id as string]);
+  const today = localDateIso();
+  const closedToday = !!minDate && minDate > today;
+  useEffect(() => {
+    if (minDate && minDate <= today && effDate < minDate) setEffDate(minDate);
+  }, [minDate]);
 
   async function handleSave() {
     if (!name.trim()) {
@@ -59,13 +71,18 @@ export default function EquipeFormScreen() {
     const schedErr = validateSchedule(schedule);
     setScheduleError(schedErr);
     if (schedErr) return;
+    if (scheduleChanged && closedToday) {
+      showMessage('Dia fechado', 'O dia de hoje já está fechado para esta equipe. Reabra o dia antes de mudar a jornada.');
+      return;
+    }
     setSaving(true);
     try {
       let teamId = isNew ? '' : (id as string);
+      // na criação a jornada entra junto; na edição, mudar a jornada cria uma NOVA versão com data
       const payload = {
         name: name.trim(),
         leader_id: leaderId || null,
-        ...(sendSchedule
+        ...(isNew
           ? {
               shift_start: schedule.start,
               shift_end: schedule.end,
@@ -74,6 +91,18 @@ export default function EquipeFormScreen() {
             }
           : {}),
       };
+
+      if (!isNew && scheduleChanged) {
+        const { error } = await supabase.rpc('set_team_schedule', {
+          p_team: teamId,
+          p_start: schedule.start,
+          p_end: schedule.end,
+          p_bs: schedule.breakStart || null,
+          p_be: schedule.breakEnd || null,
+          p_effective: effDate,
+        });
+        if (error) throw error;
+      }
 
       if (isNew) {
         const { data, error } = await supabase.from('teams').insert(payload).select('id').single();
@@ -120,7 +149,19 @@ export default function EquipeFormScreen() {
         onChange={setLeaderId}
       />
       <Text style={styles.sectionTitle}>Jornada padrão da equipe</Text>
-      <ScheduleFields value={schedule} onChange={(v) => { setSchedule(v); setSendSchedule(true); setScheduleError(''); }} error={scheduleError} />
+      <ScheduleFields value={schedule} onChange={(v) => { setSchedule(v); setScheduleError(''); }} error={scheduleError} />
+      {scheduleChanged && (
+        <EffectiveDateField
+          value={effDate}
+          onChange={setEffDate}
+          minDate={minDate && minDate <= today ? minDate : undefined}
+          label="Nova jornada vale a partir de"
+          hint="Os dias anteriores continuam com a jornada que tinham."
+        />
+      )}
+      {scheduleChanged && closedToday && (
+        <Text style={styles.hint}>O dia de hoje já está fechado: reabra o dia para mudar a jornada.</Text>
+      )}
       <Text style={styles.hint}>
         Só aparecem quem tem perfil Líder ou Gerente. Para alguém aparecer aqui, defina o perfil em Configurações → Usuários.
         Os funcionários entram na equipe pela tela Funcionários.
