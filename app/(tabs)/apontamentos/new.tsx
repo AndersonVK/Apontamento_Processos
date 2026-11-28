@@ -17,6 +17,7 @@ import { useAuth } from '../../../contexts/AuthContext';
 import { useEmployees } from '../../../hooks/useEmployees';
 import { useActivities } from '../../../hooks/useActivities';
 import { useProjects } from '../../../hooks/useProjects';
+import { useDayLocked, LOCKED_MESSAGE } from '../../../hooks/useDayLocked';
 import { Activity, ApontamentoFormData } from '../../../types';
 import { Button } from '../../../components/ui/Button';
 import { Select } from '../../../components/ui/Select';
@@ -83,6 +84,7 @@ export default function NewApontamentoScreen() {
   }, [loadingProj, projects]);
 
   const selectedActivity = activities.find((a) => a.id === form.activity_id);
+  const locked = useDayLocked(form.work_date);
 
   function setField(key: keyof ApontamentoFormData, value: any) {
     setForm((f) => ({ ...f, [key]: value }));
@@ -295,10 +297,12 @@ export default function NewApontamentoScreen() {
         />
 
         <View style={styles.actions}>
+          {locked && <Text style={styles.noProjects}>{LOCKED_MESSAGE}</Text>}
           <Button
             title={addAnother ? 'Salvar e adicionar outro' : 'Salvar'}
             onPress={handleSave}
             loading={saving}
+            disabled={locked}
             fullWidth
             size="lg"
           />

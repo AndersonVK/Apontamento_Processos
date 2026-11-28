@@ -104,7 +104,12 @@ async function flushOutbox(): Promise<{ synced: number; failed: number }> {
       synced++;
     } catch (err: any) {
       if (isNetworkError(err)) break; // sem rede de verdade: tenta de novo depois
-      await markRejected(op.id, err?.message ?? 'Erro desconhecido');
+      await markRejected(
+        op.id,
+        err?.code === '42501'
+          ? 'O dia está fechado (ou sem permissão). Peça a um gerente para reabrir.'
+          : err?.message ?? 'Erro desconhecido'
+      );
       failed++;
     }
   }

@@ -2,6 +2,7 @@ import { useEffect } from 'react';
 import { AppState, Platform } from 'react-native';
 import NetInfo from '@react-native-community/netinfo';
 import { syncPending } from '../lib/sync';
+import { pruneOldRosterCache } from '../lib/cache';
 import { useAuth } from '../contexts/AuthContext';
 
 /** Sincroniza a fila offline ao abrir o app, ao voltar para ele e quando a internet volta. */
@@ -12,6 +13,7 @@ export function useAutoSync() {
     if (!session) return;
 
     syncPending().catch(() => {});
+    pruneOldRosterCache();
 
     const unsubNet = NetInfo.addEventListener((state) => {
       if (state.isConnected) syncPending().catch(() => {});

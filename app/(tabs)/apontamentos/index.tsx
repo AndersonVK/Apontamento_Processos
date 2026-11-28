@@ -6,6 +6,8 @@ import { useAuth } from '../../../contexts/AuthContext';
 import { useRoster, useTeamsOverview, RosterRow, RosterRecord } from '../../../hooks/useRoster';
 import { RosterRowCard } from '../../../components/apontamento/RosterRowCard';
 import { RecordsView } from '../../../components/apontamento/RecordsView';
+import { DateBar } from '../../../components/apontamento/DateBar';
+import { CalendarSheet } from '../../../components/apontamento/CalendarSheet';
 import { AbsenceSheet } from '../../../components/apontamento/AbsenceSheet';
 import { IdleSheet } from '../../../components/apontamento/IdleSheet';
 import { DaySheet } from '../../../components/apontamento/DaySheet';
@@ -17,15 +19,6 @@ import * as day from '../../../lib/dayService';
 import { removeOp, getOutbox } from '../../../lib/outbox';
 import { Colors } from '../../../constants/colors';
 import { HEADER_TOP_PADDING } from '../../../constants/layout';
-
-const DAYS = 7;
-
-function labelDate(iso: string): string {
-  if (iso === daysAgoIso(0)) return 'Hoje';
-  if (iso === daysAgoIso(1)) return 'Ontem';
-  const [, m, d] = iso.split('-');
-  return `${d}/${m}`;
-}
 
 type Item = { type: 'row'; row: RosterRow } | { type: 'label'; text: string };
 
@@ -41,6 +34,7 @@ export default function ApontamentosScreen() {
   const [absenceFor, setAbsenceFor] = useState<RosterRow | null>(null);
   const [idleFor, setIdleFor] = useState<{ row: RosterRow; gap?: Interval } | null>(null);
   const [daySheet, setDaySheet] = useState(false);
+  const [calendarOpen, setCalendarOpen] = useState(false);
 
   const isManager = profile?.role === 'director' || profile?.role === 'manager';
   const canAdd = profile?.role === 'leader' || isManager;
@@ -51,7 +45,6 @@ export default function ApontamentosScreen() {
 
   useFocusEffect(useCallback(() => { roster.reload(); }, [roster.reload]));
 
-  const dates = Array.from({ length: DAYS }, (_, i) => daysAgoIso(i));
   const members = rows.filter((r) => !r.borrowed);
   const borrowed = rows.filter((r) => r.borrowed);
   const items: Item[] = [
@@ -122,6 +115,9 @@ export default function ApontamentosScreen() {
     for (const o of ops.filter((x) => x.last_error)) await removeOp(o.id);
   }
 
+  // líder não altera um dia já fechado (o banco também recusa); gerente/diretor sim
+  const locked = !!teamDay?.closed_at && profile?.role === 'leader';
+
   const allDone = summary.total > 0 && summary.complete + summary.absent === summary.total;
 
   const header = (
@@ -169,11 +165,15 @@ export default function ApontamentosScreen() {
       {teamDay?.closed_at && (
         <View style={[styles.banner, styles.bannerGreen]}>
           <Text style={styles.bannerGreenText}>
-            Dia fechado às {new Date(teamDay.closed_at).toTimeString().slice(0, 5)}
+            {locked
+              ? `Dia fechado às ${new Date(teamDay.closed_at).toTimeString().slice(0, 5)}. Edição travada: só gerente ou diretor pode alterar ou reabrir.`
+              : `Dia fechado às ${new Date(teamDay.closed_at).toTimeString().slice(0, 5)}`}
           </Text>
-          <Pressable onPress={() => teamId && day.reopenDay(teamId, date)}>
-            <Text style={styles.bannerLink}>Reabrir</Text>
-          </Pressable>
+          {!locked && (
+            <Pressable onPress={() => teamId && day.reopenDay(teamId, date)}>
+              <Text style={styles.bannerLink}>Reabrir</Text>
+            </Pressable>
+          )}
         </View>
       )}
 
@@ -195,7 +195,7 @@ export default function ApontamentosScreen() {
 
   const footer = (
     <View style={styles.footer}>
-      {canAdd && rows.length > 0 && (
+      {canAdd && !locked && rows.length > 0 && (
         <>
           <TouchableOpacity style={styles.footBtn} onPress={() => { setSelectMode((v) => !v); setSelected(new Set()); }}>
             <Ionicons name="checkbox-outline" size={18} color={Colors.gray700} />
@@ -223,7 +223,7 @@ export default function ApontamentosScreen() {
           <Text style={styles.greeting}>Olá, {profile?.name?.split(' ')[0]} 👋</Text>
           <Text style={styles.subtitle}>{team?.name ?? 'Apontamentos'}</Text>
         </View>
-        {canAdd && (
+        {canAdd && !locked && (
           <TouchableOpacity
             style={styles.addBtn}
             onPress={() => router.push({ pathname: '/apontamentos/new', params: { work_date: date } })}
@@ -233,13 +233,7 @@ export default function ApontamentosScreen() {
         )}
       </View>
 
-      <View style={styles.dateTabs}>
-        {dates.map((d) => (
-          <TouchableOpacity key={d} style={[styles.dateTab, d === date && styles.dateTabActive]} onPress={() => setDate(d)}>
-            <Text style={[styles.dateTabText, d === date && styles.dateTabTextActive]}>{labelDate(d)}</Text>
-          </TouchableOpacity>
-        ))}
-      </View>
+      <DateBar date={date} onChange={setDate} onOpenCalendar={() => setCalendarOpen(true)} />
 
       <View style={styles.segment}>
         {(['equipe', 'registros'] as const).map((m) => (
@@ -285,6 +279,7 @@ export default function ApontamentosScreen() {
                       : setExpanded((cur) => (cur === item.row.employee.id ? null : item.row.employee.id))
                   }
                   selectMode={selectMode}
+                  readOnly={locked}
                   selected={selected.has(item.row.employee.id)}
                   canOpenRecord={(r: RosterRecord) => r.synced && (r.mine || isManager)}
                   onOpenRecord={(r) => router.push(`/apontamentos/${r.id}`)}
@@ -325,6 +320,14 @@ export default function ApontamentosScreen() {
           )}
         </>
       )}
+
+      <CalendarSheet
+        visible={calendarOpen}
+        selected={date}
+        teamId={teamId}
+        onSelect={(iso) => { setDate(iso); setCalendarOpen(false); }}
+        onClose={() => setCalendarOpen(false)}
+      />
 
       <AbsenceSheet
         visible={!!absenceFor}
@@ -407,14 +410,6 @@ const styles = StyleSheet.create({
     width: 38, height: 38, borderRadius: 19, backgroundColor: Colors.primary,
     alignItems: 'center', justifyContent: 'center',
   },
-  dateTabs: {
-    flexDirection: 'row', paddingHorizontal: 12, paddingVertical: 4, backgroundColor: Colors.white,
-    gap: 4,
-  },
-  dateTab: { paddingHorizontal: 12, paddingVertical: 5, borderRadius: 20 },
-  dateTabActive: { backgroundColor: Colors.primary },
-  dateTabText: { fontSize: 13, color: Colors.gray500, fontWeight: '500' },
-  dateTabTextActive: { color: Colors.white, fontWeight: '700' },
   segment: {
     flexDirection: 'row', backgroundColor: Colors.white, paddingHorizontal: 12, paddingBottom: 8,
     borderBottomWidth: 1, borderBottomColor: Colors.border, gap: 6,

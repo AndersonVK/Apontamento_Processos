@@ -5,6 +5,7 @@ import { useAuth } from '../../../contexts/AuthContext';
 import { useEmployees } from '../../../hooks/useEmployees';
 import { useActivities } from '../../../hooks/useActivities';
 import { useProjects } from '../../../hooks/useProjects';
+import { useDayLocked, LOCKED_MESSAGE } from '../../../hooks/useDayLocked';
 import { cacheGet } from '../../../lib/cache';
 import { submitApontamento, buildMeta, lastProjectKey } from '../../../lib/apontamentoService';
 import { durationMinutes } from '../../../lib/date';
@@ -30,6 +31,7 @@ export default function BatchApontamentoScreen() {
   const { projects, loading: loadingProj } = useProjects();
 
   const [remaining, setRemaining] = useState<string[]>((params.employees ?? '').split(',').filter(Boolean));
+  const locked = useDayLocked(params.work_date);
   const [projectId, setProjectId] = useState('');
   const [activityId, setActivityId] = useState('');
   const [start, setStart] = useState(params.start_time ?? '07:00');
@@ -179,7 +181,8 @@ export default function BatchApontamentoScreen() {
           ))}
         </View>
 
-        <Button title={`Salvar para ${remaining.length}`} onPress={handleSave} loading={saving} fullWidth size="lg" />
+        {locked && <Text style={styles.hint}>{LOCKED_MESSAGE}</Text>}
+        <Button title={`Salvar para ${remaining.length}`} onPress={handleSave} loading={saving} disabled={locked} fullWidth size="lg" />
       </ScrollView>
     </KeyboardAvoidingView>
   );

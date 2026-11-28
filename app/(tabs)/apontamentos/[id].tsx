@@ -16,6 +16,7 @@ import { Card } from '../../../components/ui/Card';
 import { Button } from '../../../components/ui/Button';
 import { Colors } from '../../../constants/colors';
 import { notifyQueueChange } from '../../../lib/sync';
+import { useDayLocked, LOCKED_MESSAGE } from '../../../hooks/useDayLocked';
 import { shortTime, formatDuration } from '../../../lib/date';
 import { showMessage, confirmAction } from '../../../lib/dialog';
 
@@ -47,6 +48,8 @@ export default function ApontamentoDetailScreen() {
   }
 
   useFocusEffect(useCallback(() => { load(); }, [id]));
+  // hooks sempre ANTES dos retornos antecipados (senão o React quebra)
+  const locked = useDayLocked(apontamento?.work_date);
 
   async function handleDelete() {
     if (!(await confirmAction('Excluir', 'Deseja excluir este apontamento?', 'Excluir', true))) return;
@@ -76,9 +79,10 @@ export default function ApontamentoDetailScreen() {
   }
 
   const canDelete =
-    profile?.role === 'director' ||
-    profile?.role === 'manager' ||
-    (profile?.role === 'leader' && apontamento.leader_id === profile?.id);
+    !locked &&
+    (profile?.role === 'director' ||
+      profile?.role === 'manager' ||
+      (profile?.role === 'leader' && apontamento.leader_id === profile?.id));
 
   return (
     <ScrollView style={styles.container} contentContainerStyle={styles.content}>
@@ -130,6 +134,8 @@ export default function ApontamentoDetailScreen() {
           </>
         )}
       </Card>
+
+      {locked && <Text style={{ fontSize: 12, color: Colors.danger }}>{LOCKED_MESSAGE}</Text>}
 
       {canDelete && (
         <Button

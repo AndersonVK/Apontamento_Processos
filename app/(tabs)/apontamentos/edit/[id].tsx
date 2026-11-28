@@ -3,6 +3,7 @@ import { View, Text, StyleSheet, ScrollView, ActivityIndicator } from 'react-nat
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { supabase } from '../../../../lib/supabase';
 import { notifyQueueChange } from '../../../../lib/sync';
+import { useDayLocked, LOCKED_MESSAGE } from '../../../../hooks/useDayLocked';
 import { durationMinutes, formatDateBr, shortTime } from '../../../../lib/date';
 import { useEmployees } from '../../../../hooks/useEmployees';
 import { useProjects } from '../../../../hooks/useProjects';
@@ -31,6 +32,7 @@ export default function EditApontamentoScreen() {
   const [saving, setSaving] = useState(false);
   const [activity, setActivity] = useState<Activity | null>(null);
   const [workDate, setWorkDate] = useState('');
+  const locked = useDayLocked(workDate || undefined);
   const [employeeId, setEmployeeId] = useState('');
   const [projectId, setProjectId] = useState('');
   const [start, setStart] = useState('');
@@ -192,7 +194,8 @@ export default function EditApontamentoScreen() {
 
       <Input label="Observações" value={notes} onChangeText={setNotes} placeholder="Opcional..." multiline numberOfLines={3} />
 
-      <Button title="Salvar alterações" onPress={handleSave} loading={saving} fullWidth size="lg" />
+      {locked && <Text style={{ color: Colors.danger, fontSize: 13 }}>{LOCKED_MESSAGE}</Text>}
+      <Button title="Salvar alterações" onPress={handleSave} loading={saving} disabled={locked} fullWidth size="lg" />
     </ScrollView>
   );
 }

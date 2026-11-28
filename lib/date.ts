@@ -45,3 +45,38 @@ export function formatDateBr(iso: string): string {
   const [y, m, d] = iso.split('-');
   return `${d}/${m}/${y}`;
 }
+
+/** "2026-11-28" -> Date no fuso local (evita o deslocamento do UTC). */
+export function parseLocalDate(iso: string): Date {
+  const [y, m, d] = iso.split('-').map(Number);
+  return new Date(y, (m ?? 1) - 1, d ?? 1);
+}
+
+export function addDaysIso(iso: string, days: number): string {
+  const d = parseLocalDate(iso);
+  d.setDate(d.getDate() + days);
+  return localDateIso(d);
+}
+
+const WEEKDAYS = ['dom', 'seg', 'ter', 'qua', 'qui', 'sex', 'sáb'];
+const MONTHS = [
+  'Janeiro', 'Fevereiro', 'Março', 'Abril', 'Maio', 'Junho',
+  'Julho', 'Agosto', 'Setembro', 'Outubro', 'Novembro', 'Dezembro',
+];
+
+export function monthName(monthIndex: number): string {
+  return MONTHS[monthIndex] ?? '';
+}
+
+/** "sáb, 28/11" (com o ano se não for o ano atual). */
+export function formatDateLabel(iso: string): string {
+  const d = parseLocalDate(iso);
+  const dd = String(d.getDate()).padStart(2, '0');
+  const mm = String(d.getMonth() + 1).padStart(2, '0');
+  const year = d.getFullYear() !== new Date().getFullYear() ? `/${d.getFullYear()}` : '';
+  return `${WEEKDAYS[d.getDay()]}, ${dd}/${mm}${year}`;
+}
+
+export function isFutureDate(iso: string): boolean {
+  return iso > localDateIso();
+}

@@ -86,6 +86,9 @@ export async function submitApontamento(
     return 'online';
   } catch (e: any) {
     if (isNetworkError(e)) return saveLocally();
+    if (e?.code === '42501') {
+      throw new Error('Este dia está fechado (ou você não tem permissão). Peça a um gerente para reabrir.');
+    }
     throw e;
   }
 }

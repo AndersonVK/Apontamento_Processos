@@ -30,11 +30,12 @@ interface Props {
   onJustify: (gap?: Interval) => void;
   onAbsence: () => void;
   onDeleteIdle: (id: string) => void;
+  readOnly?: boolean;
 }
 
 export function RosterRowCard({
   row, expanded, onToggle, selectMode, selected, canOpenRecord, onOpenRecord,
-  onAdd, onJustify, onAbsence, onDeleteIdle,
+  onAdd, onJustify, onAbsence, onDeleteIdle, readOnly = false,
 }: Props) {
   const st = STATUS[row.status];
   const { analysis } = row;
@@ -130,13 +131,15 @@ export function RosterRowCard({
                 </Text>
                 {b.note ? <Text style={styles.recSub}>{b.note}</Text> : null}
               </View>
-              <Pressable onPress={() => onDeleteIdle(b.id)} hitSlop={8}>
-                <Ionicons name="trash-outline" size={18} color={Colors.danger} />
-              </Pressable>
+              {!readOnly && (
+                <Pressable onPress={() => onDeleteIdle(b.id)} hitSlop={8}>
+                  <Ionicons name="trash-outline" size={18} color={Colors.danger} />
+                </Pressable>
+              )}
             </View>
           ))}
 
-          {row.status === 'partial' &&
+          {row.status === 'partial' && !readOnly &&
             analysis.gaps.map((g, i) => (
               <View key={i} style={styles.gapRow}>
                 <Text style={styles.gapText}>Sem apontar: {fmtMin(g.start)}–{fmtMin(g.end)}</Text>
@@ -149,6 +152,7 @@ export function RosterRowCard({
               </View>
             ))}
 
+          {!readOnly && (
           <View style={styles.actions}>
             {row.status !== 'absent' && (
               <Pressable style={styles.actPrimary} onPress={() => onAdd()}>
@@ -167,6 +171,7 @@ export function RosterRowCard({
               </Text>
             </Pressable>
           </View>
+          )}
         </View>
       )}
     </View>
